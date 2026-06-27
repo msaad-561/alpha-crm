@@ -57,7 +57,10 @@ function renderModelsPage(state, container) {
 
     // ── Models grid
     if (!(state.models || []).length) {
-      container.innerHTML += `<div class="empty-state"><div class="empty-state-icon">🎭</div><div class="empty-state-title">No models yet</div><p>Add models or influencers you hire for clients.</p></div>`;
+      const empty = document.createElement('div');
+      empty.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎭</div><div class="empty-state-title">No models yet</div><p>Click "+ Add Model" to register models or influencers.</p></div>`;
+      container.appendChild(empty);
+
       return;
     }
 
