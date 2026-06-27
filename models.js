@@ -95,14 +95,20 @@ function renderModelsPage(state, container) {
         `;
       }).join('');
 
+      const genderIcon = model.gender === 'Male' ? '👨' : model.gender === 'Female' ? '👩' : '🧑';
+      const waBtn = model.whatsapp
+        ? `<a href="https://wa.me/${model.whatsapp.replace(/\D/g,'')}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none;padding:4px 8px;font-size:11px">💬 WA</a>`
+        : '';
+
       card.innerHTML = `
         <div class="model-card-header">
           <span class="avatar avatar-lg" style="background:${c.bg};color:${c.text};width:44px;height:44px;font-size:14px">${model.initials}</span>
           <div class="model-info">
-            <div class="model-name">${model.name}</div>
-            <div class="model-sub">${allPmts.length} payment${allPmts.length !== 1 ? 's' : ''} · ${formatCurrency(state, totalAll)} all time</div>
+            <div class="model-name">${genderIcon} ${model.name}</div>
+            <div class="model-sub">${allPmts.length} payment${allPmts.length !== 1 ? 's' : ''} · ${formatCurrency(state, totalAll)} all time${model.defaultPay ? ` · Pay: ${formatCurrency(state, model.defaultPay)}` : ''}</div>
           </div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;align-items:center">
+            ${waBtn}
             <button class="btn btn-primary btn-sm add-pmt-btn" data-model-id="${model.id}">+ Pay</button>
             <button class="btn btn-danger btn-sm del-model-btn" data-model-id="${model.id}" title="Delete model">🗑</button>
           </div>
@@ -115,6 +121,7 @@ function renderModelsPage(state, container) {
           <span class="model-total-value">${formatCurrency(state, totalPeriod)}</span>
         </div>
       `;
+
 
       // Events
       card.querySelector('.add-pmt-btn').addEventListener('click', () =>
@@ -151,35 +158,62 @@ function renderModelsPage(state, container) {
 
 // ─── Add Model Modal ───────────────────────────────────────────
 function openAddModelModal(state, onSave) {
+  const clientOptions = (state.clients || [])
+    .filter(c => (c.clientStatus || 'Active') === 'Active')
+    .map(c => `<option value="${c.id}">${c.name}</option>`)
+    .join('');
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
-    <div class="modal" style="max-width:420px">
+    <div class="modal" style="max-width:460px">
       <div class="modal-header">
-        <div><div class="modal-title">Add Model / Influencer</div></div>
+        <div>
+          <div class="modal-title">Add Model / Influencer</div>
+          <div class="modal-subtitle">Register a model or influencer for your agency</div>
+        </div>
         <button class="modal-close" id="mdl-close">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="modal-body">
+
+        <div class="form-group">
+          <label class="form-label" for="mdl-name">Model Name *</label>
+          <input class="form-input" type="text" id="mdl-name" placeholder="e.g. Sara Khan" />
+        </div>
+
         <div class="form-grid-2">
           <div class="form-group">
-            <label class="form-label" for="mdl-name">Full Name</label>
-            <input class="form-input" type="text" id="mdl-name" placeholder="e.g. Sara Khan" />
+            <label class="form-label">Gender *</label>
+            <div style="display:flex;gap:10px;margin-top:4px">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary)">
+                <input type="radio" name="mdl-gender" value="Female" checked style="accent-color:var(--accent)" /> 👩 Female
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary)">
+                <input type="radio" name="mdl-gender" value="Male" style="accent-color:var(--accent)" /> 👨 Male
+              </label>
+            </div>
           </div>
           <div class="form-group">
-            <label class="form-label" for="mdl-initials">Initials</label>
-            <input class="form-input" type="text" id="mdl-initials" placeholder="SK" maxlength="2" />
+            <label class="form-label" for="mdl-pay">Model Pay (${state.currency}) *</label>
+            <input class="form-input" type="number" id="mdl-pay" placeholder="e.g. 15000" min="0" />
           </div>
         </div>
+
         <div class="form-group">
-          <label class="form-label" for="mdl-color">Avatar Color</label>
-          <select class="form-input" id="mdl-color">
-            <option value="0">Blue</option><option value="1">Purple</option><option value="2">Green</option>
-            <option value="3">Amber</option><option value="4">Rose</option><option value="5">Teal</option>
-            <option value="6">Indigo</option><option value="7">Red</option>
+          <label class="form-label" for="mdl-whatsapp">WhatsApp Number</label>
+          <input class="form-input" type="text" id="mdl-whatsapp" placeholder="+92 300 0000000" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="mdl-client">Model for Client</label>
+          <select class="form-input" id="mdl-client">
+            <option value="">— Select client (optional) —</option>
+            ${clientOptions}
           </select>
         </div>
+
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="mdl-cancel">Cancel</button>
@@ -198,16 +232,55 @@ function openAddModelModal(state, onSave) {
 
   overlay.querySelector('#mdl-save').addEventListener('click', () => {
     const name     = overlay.querySelector('#mdl-name').value.trim();
-    const initials = overlay.querySelector('#mdl-initials').value.trim().toUpperCase();
-    const colorIdx = parseInt(overlay.querySelector('#mdl-color').value);
-    if (!name || !initials) { alert('Please enter a name and initials.'); return; }
+    const gender   = overlay.querySelector('input[name="mdl-gender"]:checked').value;
+    const pay      = parseFloat(overlay.querySelector('#mdl-pay').value);
+    const whatsapp = overlay.querySelector('#mdl-whatsapp').value.trim();
+    const clientId = overlay.querySelector('#mdl-client').value;
+
+    if (!name) { alert('Please enter the model name.'); return; }
+    if (isNaN(pay) || pay < 0) { alert('Please enter a valid pay amount.'); return; }
+
+    // Auto-generate initials from name
+    const parts    = name.split(' ').filter(Boolean);
+    const initials = parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+
+    // Pick avatar color based on gender
+    const colorIdx = gender === 'Female' ? 4 : 1; // Rose for female, Purple for male
+
     if (!state.models) state.models = [];
-    state.models.push({ id: generateId(), name, initials: initials.slice(0, 2), colorIdx, payments: [] });
+    const newModel = {
+      id: generateId(),
+      name,
+      initials,
+      colorIdx,
+      gender,
+      whatsapp: whatsapp || null,
+      defaultPay: pay,
+      defaultClientId: clientId || null,
+      payments: [],
+    };
+
+    // If a client is selected, auto-create the first payment entry
+    if (clientId && pay > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      newModel.payments.push({
+        id: generateId(),
+        amount: pay,
+        date: today,
+        description: 'Initial payment',
+        clientId,
+      });
+    }
+
+    state.models.push(newModel);
     saveState(state);
     close();
     onSave();
   });
 }
+
 
 // ─── Add Model Payment Modal ───────────────────────────────────
 function openAddModelPaymentModal(state, modelId, onSave) {
@@ -216,8 +289,11 @@ function openAddModelPaymentModal(state, modelId, onSave) {
 
   const today = new Date().toISOString().split('T')[0];
   const clientOptions = (state.clients || [])
-    .map(c => `<option value="${c.id}">${c.name}</option>`)
+    .map(c => `<option value="${c.id}" ${c.id === model.defaultClientId ? 'selected' : ''}>${c.name}</option>`)
     .join('');
+
+  const defaultAmount = model.defaultPay || '';
+
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -236,7 +312,7 @@ function openAddModelPaymentModal(state, modelId, onSave) {
         <div class="form-grid-2">
           <div class="form-group">
             <label class="form-label" for="mp-amount">Amount (${state.currency})</label>
-            <input class="form-input" type="number" id="mp-amount" placeholder="e.g. 15000" min="0" />
+            <input class="form-input" type="number" id="mp-amount" placeholder="e.g. 15000" min="0" value="${defaultAmount}" />
           </div>
           <div class="form-group">
             <label class="form-label" for="mp-date">Date</label>
