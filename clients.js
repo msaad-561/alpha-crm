@@ -178,7 +178,7 @@ function buildClientTable(state, clients) {
       </td>
       <td>
         <span style="font-weight:700;font-size:14px">${formatCurrency(state, client.retainerAmount)}</span>
-        <div style="font-size:11.5px;color:var(--text-muted)">per month</div>
+        <div style="font-size:11.5px;color:var(--text-muted)">${(client.paymentType || 'retainer') === 'one-time' ? 'one-time' : 'per month'}</div>
       </td>
       <td style="font-size:12.5px;color:var(--text-secondary);max-width:180px">${memberShares || '—'}</td>
       <td>
@@ -266,9 +266,12 @@ function buildPreviousClientsSection(state, clients, container, onUpdate) {
         </div>
       </div>
       <div class="churn-card-footer">
-        <span style="font-size:12px;color:var(--text-muted)">Retainer: ${formatCurrency(state, client.retainerAmount)}/mo</span>
+        <div style="font-size:12px;color:var(--text-muted)">
+          ${(client.paymentType || 'retainer') === 'one-time' ? '🔁 One-Time' : '🔁 Retainer'}: ${formatCurrency(state, client.retainerAmount)}
+        </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-secondary btn-sm reactivate-btn" data-id="${client.id}">Reactivate</button>
+          <button class="btn btn-secondary btn-sm edit-churn-btn" data-id="${client.id}">✏️ Edit</button>
           <button class="btn btn-secondary btn-sm view-churn-btn" data-id="${client.id}">View</button>
         </div>
       </div>
@@ -276,6 +279,9 @@ function buildPreviousClientsSection(state, clients, container, onUpdate) {
 
     card.querySelector('.view-churn-btn').addEventListener('click', () =>
       openClientModal(state, client.id));
+
+    card.querySelector('.edit-churn-btn').addEventListener('click', () =>
+      openAddClientModal(state, client.id));
 
     card.querySelector('.reactivate-btn').addEventListener('click', () => {
       client.clientStatus = 'Active';
@@ -602,6 +608,7 @@ function openAddClientModal(state, editId = null) {
   `).join('');
 
   const currentStatus = editing ? (editing.clientStatus || 'Active') : 'Active';
+  const currentPayType = editing ? (editing.paymentType || 'retainer') : 'retainer';
 
   overlay.innerHTML = `
     <div class="modal">
@@ -623,11 +630,18 @@ function openAddClientModal(state, editId = null) {
             <input class="form-input" type="text" id="add-name" placeholder="e.g. Apex Brands" value="${editing ? editing.name : ''}" />
           </div>
           <div class="form-group">
-            <label class="form-label" for="add-retainer">Monthly Retainer (${state.currency})</label>
+            <label class="form-label" for="add-retainer" id="retainer-label">${currentPayType === 'one-time' ? 'One-Time Payment' : 'Monthly Retainer'} (${state.currency})</label>
             <input class="form-input" type="number" id="add-retainer" placeholder="e.g. 4500" min="0" value="${editing ? editing.retainerAmount : ''}" />
           </div>
         </div>
-        <div class="form-grid-2">
+
+        <div class="form-section-title">💳 Payment Type</div>
+        <div class="status-selector" id="pay-type-selector" style="margin-bottom:16px">
+          <button type="button" class="status-option-btn ${currentPayType === 'retainer' ? 'selected-active' : ''}" data-paytype="retainer" style="border-color:${currentPayType==='retainer'?'var(--paid-text)':'var(--border)'}">🔄 Retainership<br/><span style="font-size:10px;font-weight:400;opacity:.8">Monthly recurring</span></button>
+          <button type="button" class="status-option-btn ${currentPayType === 'one-time' ? 'selected-active' : ''}" data-paytype="one-time" style="border-color:${currentPayType==='one-time'?'var(--paid-text)':'var(--border)'}">1️⃣ One-Time Pay<br/><span style="font-size:10px;font-weight:400;opacity:.8">Single payment</span></button>
+        </div>
+
+        <div class="form-grid-2" id="startday-row">
           <div class="form-group">
             <label class="form-label" for="add-startday">Payment Day of Month</label>
             <input class="form-input" type="number" id="add-startday" placeholder="e.g. 21" min="1" max="28" value="${editing ? editing.startDay : ''}" />
@@ -635,6 +649,18 @@ function openAddClientModal(state, editId = null) {
           <div class="form-group">
             <label class="form-label" for="add-phone">Client WhatsApp (optional)</label>
             <input class="form-input" type="text" id="add-phone" placeholder="+92 300 0000000" value="${editing ? (editing.contactPhone || '') : ''}" />
+          </div>
+        </div>
+        <div class="form-group" id="onetime-date-row" style="display:none">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="add-onetime-date">Payment Date</label>
+              <input class="form-input" type="date" id="add-onetime-date" value="${editing && editing.oneTimeDate ? editing.oneTimeDate : new Date().toISOString().split('T')[0]}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="add-phone2">Client WhatsApp (optional)</label>
+              <input class="form-input" type="text" id="add-phone2" placeholder="+92 300 0000000" value="${editing ? (editing.contactPhone || '') : ''}" />
+            </div>
           </div>
         </div>
 
@@ -668,6 +694,38 @@ function openAddClientModal(state, editId = null) {
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add('open'));
 
+  // Payment type toggling
+  let selectedPayType = currentPayType;
+  const startDayRow   = overlay.querySelector('#startday-row');
+  const oneTimeDateRow = overlay.querySelector('#onetime-date-row');
+  const retainerLabel  = overlay.querySelector('#retainer-label');
+
+  function updatePayTypeUI() {
+    if (selectedPayType === 'one-time') {
+      startDayRow.style.display   = 'none';
+      oneTimeDateRow.style.display = '';
+      if (retainerLabel) retainerLabel.textContent = `One-Time Payment (${state.currency})`;
+    } else {
+      startDayRow.style.display   = '';
+      oneTimeDateRow.style.display = 'none';
+      if (retainerLabel) retainerLabel.textContent = `Monthly Retainer (${state.currency})`;
+    }
+  }
+  updatePayTypeUI();
+
+  overlay.querySelectorAll('#pay-type-selector .status-option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('#pay-type-selector .status-option-btn').forEach(b => {
+        b.className = 'status-option-btn';
+        b.style.borderColor = 'var(--border)';
+      });
+      selectedPayType = btn.dataset.paytype;
+      btn.classList.add('selected-active');
+      btn.style.borderColor = 'var(--paid-text)';
+      updatePayTypeUI();
+    });
+  });
+
   let selectedStatus = currentStatus;
   overlay.querySelectorAll('#add-status-selector .status-option-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -689,13 +747,26 @@ function openAddClientModal(state, editId = null) {
   overlay.querySelector('#add-modal-save').addEventListener('click', () => {
     const name      = overlay.querySelector('#add-name').value.trim();
     const retainer  = parseFloat(overlay.querySelector('#add-retainer').value);
-    const startDay  = parseInt(overlay.querySelector('#add-startday').value);
-    const phone     = overlay.querySelector('#add-phone').value.trim();
+    const phone     = (overlay.querySelector('#add-phone') || overlay.querySelector('#add-phone2'))?.value.trim() || '';
     const notes     = overlay.querySelector('#add-notes').value.trim();
 
-    if (!name || isNaN(retainer) || isNaN(startDay) || startDay < 1 || startDay > 28) {
-      alert('Please fill in all required fields correctly (day must be 1–28).');
-      return;
+    let startDay = 1;
+    let oneTimeDate = null;
+
+    if (selectedPayType === 'retainer') {
+      startDay = parseInt(overlay.querySelector('#add-startday').value);
+      if (!name || isNaN(retainer) || isNaN(startDay) || startDay < 1 || startDay > 28) {
+        alert('Please fill in all fields correctly (day must be 1–28).');
+        return;
+      }
+    } else {
+      // one-time — no day needed
+      oneTimeDate = overlay.querySelector('#add-onetime-date')?.value || new Date().toISOString().split('T')[0];
+      if (!name || isNaN(retainer)) {
+        alert('Please enter a client name and payment amount.');
+        return;
+      }
+      startDay = 1; // placeholder
     }
 
     const members = [];
@@ -723,6 +794,8 @@ function openAddClientModal(state, editId = null) {
       editing.members        = members;
       editing.servicesPlan   = newPlan;
       editing.clientStatus   = selectedStatus;
+      editing.paymentType    = selectedPayType;
+      if (oneTimeDate) editing.oneTimeDate = oneTimeDate;
       ensureCurrentMonthLog(editing);
     } else {
       const monthKey = getCurrentMonthKey();
@@ -733,11 +806,13 @@ function openAddClientModal(state, editId = null) {
         startDay,
         contactPhone: phone,
         members,
-        payments: [{ month: monthKey, paid: false, paidDate: null }],
+        payments: [{ month: monthKey, paid: selectedPayType === 'one-time', paidDate: oneTimeDate }],
         notes,
         servicesPlan: newPlan,
         servicesLog: [],
         clientStatus: selectedStatus,
+        paymentType: selectedPayType,
+        oneTimeDate: oneTimeDate,
       };
       ensureCurrentMonthLog(newClient);
       state.clients.push(newClient);

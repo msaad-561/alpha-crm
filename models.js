@@ -161,10 +161,16 @@ function renderModelsPage(state, container) {
 
 // ─── Add Model Modal ───────────────────────────────────────────
 function openAddModelModal(state, onSave) {
-  const clientOptions = (state.clients || [])
-    .filter(c => (c.clientStatus || 'Active') === 'Active')
-    .map(c => `<option value="${c.id}">${c.name}</option>`)
-    .join('');
+  // Include ALL clients (Active, Paused, Gone) grouped
+  const allClients = state.clients || [];
+  const activeOpts  = allClients.filter(c => (c.clientStatus || 'Active') === 'Active')
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const prevOpts    = allClients.filter(c => c.clientStatus === 'Paused' || c.clientStatus === 'Gone')
+    .map(c => `<option value="${c.id}">${c.name} (${c.clientStatus})</option>`).join('');
+  const clientOptions = `
+    ${activeOpts ? `<optgroup label="Active">${activeOpts}</optgroup>` : ''}
+    ${prevOpts   ? `<optgroup label="Previous/Paused">${prevOpts}</optgroup>` : ''}
+  `;
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -291,9 +297,15 @@ function openAddModelPaymentModal(state, modelId, onSave) {
   if (!model) return;
 
   const today = new Date().toISOString().split('T')[0];
-  const clientOptions = (state.clients || [])
-    .map(c => `<option value="${c.id}" ${c.id === model.defaultClientId ? 'selected' : ''}>${c.name}</option>`)
-    .join('');
+  const allC = state.clients || [];
+  const activeC = allC.filter(c => (c.clientStatus || 'Active') === 'Active')
+    .map(c => `<option value="${c.id}" ${c.id === model.defaultClientId ? 'selected' : ''}>${c.name}</option>`).join('');
+  const prevC = allC.filter(c => c.clientStatus === 'Paused' || c.clientStatus === 'Gone')
+    .map(c => `<option value="${c.id}" ${c.id === model.defaultClientId ? 'selected' : ''}>${c.name} (${c.clientStatus})</option>`).join('');
+  const clientOptions = `
+    ${activeC ? `<optgroup label="Active">${activeC}</optgroup>` : ''}
+    ${prevC   ? `<optgroup label="Previous/Paused">${prevC}</optgroup>` : ''}
+  `;
 
   const defaultAmount = model.defaultPay || '';
 
