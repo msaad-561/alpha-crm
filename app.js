@@ -18,6 +18,8 @@ const ICONS = {
   notif:     `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>`,
   more:      `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></svg>`,
   add:       `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>`,
+  models:    `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+  expenses:  `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`,
 };
 
 // ─── App Boot ─────────────────────────────────────────────────
@@ -64,6 +66,11 @@ function buildShell(state) {
       <div class="nav-item" data-page="clients"   role="button" tabindex="0">${ICONS.clients}<span>Clients</span></div>
       <div class="nav-item" data-page="services"  role="button" tabindex="0">${ICONS.services}<span>Services</span></div>
       <div class="nav-item" data-page="founders"  role="button" tabindex="0">${ICONS.founders}<span>Founders</span></div>
+    </div>
+    <div class="sidebar-section-label">Finance</div>
+    <div class="sidebar-nav">
+      <div class="nav-item" data-page="expenses"  role="button" tabindex="0">${ICONS.expenses}<span>Expenses</span></div>
+      <div class="nav-item" data-page="models"    role="button" tabindex="0">${ICONS.models}<span>Models</span></div>
     </div>
     <div class="sidebar-section-label">Manage</div>
     <div class="sidebar-nav">
@@ -189,7 +196,7 @@ const BOTTOM_NAV_ITEMS = [
   { page: '__more',   label: 'More',     icon: 'more' },
 ];
 
-const MORE_PAGES = ['team', 'reminders', 'settings'];
+const MORE_PAGES = ['team', 'reminders', 'settings', 'models', 'expenses'];
 
 function buildBottomNav() {
   const nav = document.createElement('nav');
@@ -222,6 +229,12 @@ function buildBottomNav() {
   drawer.id = 'more-drawer';
   drawer.innerHTML = `
     <div class="drawer-items">
+      <div class="drawer-item" data-page="expenses" onclick="navigateTo('expenses');closeMoreDrawer()">
+        ${ICONS.expenses}<span>Expenses</span>
+      </div>
+      <div class="drawer-item" data-page="models" onclick="navigateTo('models');closeMoreDrawer()">
+        ${ICONS.models}<span>Models</span>
+      </div>
       <div class="drawer-item" data-page="team" onclick="navigateTo('team');closeMoreDrawer()">
         ${ICONS.team}<span>Team</span>
       </div>
@@ -261,6 +274,8 @@ function navigateTo(page) {
     team:      'Team',
     reminders: 'Reminders',
     settings:  'Settings',
+    models:    'Models & Influencers',
+    expenses:  'Overall Expenses',
   };
 
   // Update sidebar active
@@ -308,6 +323,8 @@ function renderPage(state) {
     case 'team':      renderTeamPage(state, container);      break;
     case 'reminders': renderRemindersPage(state, container); break;
     case 'settings':  renderSettingsPage(state, container);  break;
+    case 'models':    renderModelsPage(state, container);    break;
+    case 'expenses':  renderExpensesPage(state, container);  break;
     default:          renderHomePage(state, container);
   }
 }

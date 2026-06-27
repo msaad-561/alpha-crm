@@ -58,24 +58,54 @@ html, body {
 
 /* ─── Dark Mode ─────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --bg-page:        #0F172A;
-  --bg-card:        #1E293B;
-  --bg-input:       #0F172A;
-  --border:         #334155;
-  --border-light:   #243044;
+  --bg-page:        #000000;
+  --bg-card:        #0D0D0D;
+  --bg-input:       #111111;
+  --border:         #1F1F1F;
+  --border-light:   #181818;
 
-  --text-primary:   #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted:     #475569;
+  --text-primary:   #FFFFFF;
+  --text-secondary: #A3A3A3;
+  --text-muted:     #525252;
 
-  --accent-light:   #422006;
+  --accent-light:   #2D1A00;
   --accent:         #F59E0B;
-  --accent-hover:   #D97706;
+  --accent-hover:   #FBBF24;
+  --accent-text:    #000000;
 
-  --paid-bg:    #064E3B; --paid-text:    #6EE7B7;
-  --pending-bg: #422006; --pending-text: #FCD34D;
-  --overdue-bg: #450A0A; --overdue-text: #FCA5A5;
+  --paid-bg:    #052E16; --paid-text:    #4ADE80;
+  --pending-bg: #2D1A00; --pending-text: #FCD34D;
+  --overdue-bg: #2D0707; --overdue-text: #FCA5A5;
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.5);
+  --shadow-md:  0 4px 16px rgba(0,0,0,.7);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,.85);
 }
+
+/* Dark mode sidebar */
+[data-theme="dark"] #sidebar {
+  background: #0D0D0D;
+  border-right-color: #1F1F1F;
+}
+
+/* Dark mode topbar */
+[data-theme="dark"] #topbar {
+  background: #0D0D0D;
+  border-bottom-color: #1F1F1F;
+}
+
+/* Dark mode table hover */
+[data-theme="dark"] .data-table tbody tr:hover { background: #151515; }
+
+/* Dark mode metric card */
+[data-theme="dark"] .metric-card { border-color: #1F1F1F; }
+
+/* Dark mode buttons */
+[data-theme="dark"] .btn-primary {
+  background: #F59E0B;
+  color: #000000;
+}
+[data-theme="dark"] .btn-primary:hover { background: #FBBF24; }
 
 /* ─── App Shell ─────────────────────────────────────────────── */
 #app {
@@ -1688,3 +1718,403 @@ textarea.form-input { resize: vertical; min-height: 68px; }
   .login-key-dots { gap: 3px; }
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   NEW COMPONENTS — v4 Feature Update
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─── Date Filter Bar ────────────────────────────────────────── */
+.date-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.date-filter-bar .filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.filter-pill {
+  padding: 5px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.filter-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+.filter-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text, #1C1917);
+}
+
+.custom-date-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: fadeInFilter .2s ease;
+}
+
+@keyframes fadeInFilter { from { opacity:0; transform:translateX(-6px); } to { opacity:1; transform:translateX(0); } }
+
+.custom-date-inputs input[type="date"] {
+  padding: 5px 9px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.custom-date-inputs input[type="date"]:focus { border-color: var(--accent); }
+
+.custom-date-inputs span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ─── Client Status Badge ─────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.status-badge.active  { background: var(--paid-bg);    color: var(--paid-text); }
+.status-badge.paused  { background: var(--pending-bg); color: var(--pending-text); }
+.status-badge.gone    { background: var(--overdue-bg); color: var(--overdue-text); }
+
+.status-badge-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ─── Status Selector (in modal) ─────────────────────────────── */
+.status-selector {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-option-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: var(--bg-page);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  color: var(--text-secondary);
+}
+
+.status-option-btn:hover { border-color: var(--accent); color: var(--accent); }
+.status-option-btn.selected-active  { border-color: var(--paid-text);    background: var(--paid-bg);    color: var(--paid-text); }
+.status-option-btn.selected-paused  { border-color: var(--pending-text); background: var(--pending-bg); color: var(--pending-text); }
+.status-option-btn.selected-gone    { border-color: var(--overdue-text); background: var(--overdue-bg); color: var(--overdue-text); }
+
+/* ─── Client Section Tabs ─────────────────────────────────────── */
+.client-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.client-tab {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color var(--transition), border-color var(--transition);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.client-tab:hover { color: var(--text-primary); }
+.client-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.client-tab-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.client-tab.active .client-tab-count {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── Churned / Previous Client Card ──────────────────────────── */
+.churn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.churn-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  opacity: .9;
+}
+
+.churn-card-header {
+  padding: 14px 18px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.churn-client-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.churn-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 12px 18px;
+  gap: 10px;
+}
+
+.churn-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.churn-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.churn-stat-value.positive { color: var(--success); }
+.churn-stat-value.negative { color: var(--danger); }
+
+.churn-card-footer {
+  padding: 10px 18px;
+  background: var(--bg-page);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-light);
+}
+
+/* ─── Model / Influencer Cards ────────────────────────────────── */
+.models-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.model-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.model-card-header {
+  padding: 16px 18px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.model-info { flex: 1; min-width: 0; }
+.model-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.model-sub  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.model-payments-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.model-payment-item {
+  display: flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--border-light);
+  gap: 10px;
+  transition: background var(--transition);
+}
+
+.model-payment-item:last-child { border-bottom: none; }
+.model-payment-item:hover { background: var(--bg-page); }
+
+.model-payment-desc  { flex: 1; font-size: 12.5px; color: var(--text-primary); }
+.model-payment-date  { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.model-payment-amount { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.model-client-tag {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.model-card-footer {
+  padding: 10px 18px;
+  background: var(--bg-page);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.model-total-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.model-total-value { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+
+/* ─── Expense Category Chips ─────────────────────────────────── */
+.expense-category-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.expense-cat-payroll  { background: #DBEAFE; color: #1D4ED8; }
+.expense-cat-founder  { background: var(--accent-light); color: var(--accent); }
+.expense-cat-model    { background: #EDE9FE; color: #6D28D9; }
+.expense-cat-agency   { background: #FEE2E2; color: #991B1B; }
+
+[data-theme="dark"] .expense-cat-payroll { background: #1E3A5F; color: #93C5FD; }
+[data-theme="dark"] .expense-cat-model   { background: #2E1065; color: #C4B5FD; }
+[data-theme="dark"] .expense-cat-agency  { background: var(--overdue-bg); color: var(--overdue-text); }
+
+/* ─── Expense Summary Cards ──────────────────────────────────── */
+.expense-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) { .expense-metrics-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .expense-metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.expense-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+/* ─── Delete button on payment rows ─────────────────────────── */
+.row-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 3px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity var(--transition), color var(--transition);
+}
+
+.model-payment-item:hover .row-delete-btn,
+.expense-item:hover .row-delete-btn { opacity: 1; }
+.row-delete-btn:hover { color: var(--danger); }
+
+/* ─── Responsive tweaks for new pages ───────────────────────── */
+@media (max-width: 640px) {
+  .churn-grid { grid-template-columns: 1fr; }
+  .models-grid { grid-template-columns: 1fr; }
+  .churn-stats { grid-template-columns: repeat(2, 1fr); }
+  .date-filter-bar { gap: 4px; }
+  .filter-pill { padding: 4px 10px; font-size: 11px; }
+  .client-tab { padding: 8px 12px; font-size: 12px; }
+}
+
+/* ─── Expense Item row (agency expense log) ──────────────────── */
+.expense-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+
+.expense-item:last-child { border-bottom: none; }
+.expense-item:hover { background: var(--bg-page); }
+
+.expense-desc {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expense-date   { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.expense-amount { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+
+/* ─── Metric value size clamp for 3-col home grid ───────────── */
+@media (max-width: 1100px) {
+  .metrics-grid[style*="grid-template-columns:repeat(3"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 640px) {
+  .metrics-grid[style*="grid-template-columns:repeat(3"] {
+    grid-template-columns: 1fr !important;
+  }
+}

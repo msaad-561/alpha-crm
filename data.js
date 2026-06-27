@@ -1,5 +1,6 @@
 // ============================================================
 // data.js — State management, seed data, localStorage helpers
+// Alpha CRM v4
 // ============================================================
 
 const STORAGE_KEY = 'alphaCRM_v3';
@@ -17,14 +18,19 @@ const AVATAR_COLORS = [
 
 const SERVICE_TYPES = ['Reels', 'Posts', 'Stories'];
 
+// Client lifecycle statuses
+const CLIENT_STATUSES = ['Active', 'Paused', 'Gone'];
+
 const SEED_DATA = {
   agencyName: 'Alpha Businesses CRM',
   currency: 'PKR',
-  schemaVersion: 3,
+  schemaVersion: 4,
   serviceTypes: ['Reels', 'Posts', 'Stories'],
   team: [],
   clients: [],
   founders: [],
+  models: [],          // { id, name, initials, colorIdx, payments: [] }
+  agencyExpenses: [],  // { id, description, amount, date, category }
 };
 
 // ─── Date helpers ────────────────────────────────────────────
@@ -65,13 +71,51 @@ function monthKeyToFullLabel(key) {
   return new Date(+yr, +mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
+// ─── Date filter helpers ─────────────────────────────────────
+
+// period: 'this_month' | 'prev_month' | 'max' | 'custom'
+// Returns { start: Date|null, end: Date|null } for range checks
+function getFilterRange(period, customStart, customEnd) {
+  const now = new Date();
+  if (period === 'this_month') {
+    const s = new Date(now.getFullYear(), now.getMonth(), 1);
+    const e = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    return { start: s, end: e };
+  }
+  if (period === 'prev_month') {
+    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const e = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    return { start: s, end: e };
+  }
+  if (period === 'custom' && customStart && customEnd) {
+    return {
+      start: new Date(customStart + 'T00:00:00'),
+      end:   new Date(customEnd   + 'T23:59:59'),
+    };
+  }
+  return { start: null, end: null }; // 'max' = no filter
+}
+
+// Return the month key string for a given filter period
+function getFilterMonthKey(period) {
+  if (period === 'prev_month') return getPrevMonthKey();
+  return getCurrentMonthKey(); // default = this month (for max we use current)
+}
+
+// Check if a date string (YYYY-MM-DD) is within a filter range
+function dateInRange(dateStr, range) {
+  if (!range.start) return true; // max = all
+  if (!dateStr) return false;
+  const d = new Date(dateStr + 'T00:00:00');
+  return d >= range.start && d <= range.end;
+}
+
 // ─── localStorage ────────────────────────────────────────────
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
-    // Migrate old key
     const old = localStorage.getItem('agencyOS_v1');
     if (old) {
       const parsed = JSON.parse(old);
@@ -87,17 +131,14 @@ function loadState() {
   return null;
 }
 
-// localStorage-only save (used by Firebase boot before Firestore is ready)
 function saveStateLocal(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) { /* ignore */ }
 }
 
-// Full save: localStorage + Firestore (if connected)
 function saveState(state) {
   const json = JSON.stringify(state);
-  // Track what we're saving to prevent Firestore echo re-renders
   if (typeof _lastSavedJSON !== 'undefined') {
     window._lastSavedJSONGlobal = json;
     if (typeof window !== 'undefined') _lastSavedJSON = json;
@@ -105,7 +146,6 @@ function saveState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, json);
   } catch (e) { /* ignore */ }
-  // Push to Firestore (if firebase.js has loaded and connected)
   if (typeof saveToFirestore === 'function') {
     saveToFirestore(state);
   }
@@ -116,18 +156,32 @@ function initState() {
   if (!state) {
     state = JSON.parse(JSON.stringify(SEED_DATA));
   }
-  // Force schema upgrade: if old sample data detected, clear it
+  // Schema upgrade
   if (!state.schemaVersion || state.schemaVersion < 3) {
     state = JSON.parse(JSON.stringify(SEED_DATA));
   }
-  // Ensure schema fields exist
-  if (!state.serviceTypes) state.serviceTypes = ['Reels', 'Posts', 'Stories'];
-  if (!state.founders)     state.founders     = [];
+  // v4 migration
+  if (state.schemaVersion < 4) {
+    if (!state.models)         state.models         = [];
+    if (!state.agencyExpenses) state.agencyExpenses = [];
+    state.schemaVersion = 4;
+  }
+  // Ensure fields exist
+  if (!state.serviceTypes)   state.serviceTypes   = ['Reels', 'Posts', 'Stories'];
+  if (!state.founders)       state.founders       = [];
+  if (!state.models)         state.models         = [];
+  if (!state.agencyExpenses) state.agencyExpenses = [];
+
   state.clients && state.clients.forEach(c => {
-    if (!c.servicesPlan) c.servicesPlan = { Reels: 0, Posts: 0, Stories: 0 };
-    if (!c.servicesLog)  c.servicesLog  = [];
+    if (!c.servicesPlan)  c.servicesPlan  = { Reels: 0, Posts: 0, Stories: 0 };
+    if (!c.servicesLog)   c.servicesLog   = [];
+    if (!c.clientStatus)  c.clientStatus  = 'Active';
     ensureCurrentMonthLog(c);
   });
+  state.models && state.models.forEach(m => {
+    if (!m.payments) m.payments = [];
+  });
+
   saveStateLocal(state);
   return state;
 }
@@ -145,7 +199,6 @@ function ensureCurrentMonthLog(client) {
     });
     client.servicesLog.push(log);
   } else {
-    // Sync array lengths if plan changed
     const plan = client.servicesPlan || {};
     Object.keys(plan).forEach(type => {
       const quota = plan[type] || 0;
@@ -204,6 +257,16 @@ function getClientStatus(client) {
   return 'Pending';
 }
 
+// Only Active clients
+function getActiveClients(state) {
+  return (state.clients || []).filter(c => (c.clientStatus || 'Active') === 'Active');
+}
+
+// Gone or Paused clients
+function getPreviousClients(state) {
+  return (state.clients || []).filter(c => c.clientStatus === 'Gone' || c.clientStatus === 'Paused');
+}
+
 function getTeamMember(state, id) {
   return state.team.find(t => t.id === id);
 }
@@ -212,7 +275,6 @@ function getAvatarColor(idx) {
   return AVATAR_COLORS[idx % AVATAR_COLORS.length];
 }
 
-// PKR as suffix: "4,500 PKR"
 function formatCurrency(state, amount) {
   const num = Number(amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   return `${num} ${state.currency}`;
@@ -229,32 +291,47 @@ function formatDueDate(client) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// ─── Revenue / expense helpers ───────────────────────────────
+
 function getTotalRetainers(state) {
-  return state.clients.reduce((sum, c) => sum + c.retainerAmount, 0);
+  return getActiveClients(state).reduce((sum, c) => sum + c.retainerAmount, 0);
 }
 
 function getCollectedThisMonth(state) {
   const key = getCurrentMonthKey();
-  return state.clients
+  return getActiveClients(state)
     .filter(c => c.payments.find(p => p.month === key && p.paid))
     .reduce((sum, c) => sum + c.retainerAmount, 0);
 }
 
 function getCollectedForMonth(state, monthKey) {
-  return state.clients
+  return getActiveClients(state)
     .filter(c => c.payments.find(p => p.month === monthKey && p.paid))
     .reduce((sum, c) => sum + c.retainerAmount, 0);
 }
 
+// Gross sales for a filter range (all paid payments whose paidDate falls in range)
+function getGrossSalesForRange(state, range) {
+  let total = 0;
+  getActiveClients(state).forEach(c => {
+    c.payments.forEach(p => {
+      if (p.paid && dateInRange(p.paidDate, range)) {
+        total += c.retainerAmount;
+      }
+    });
+  });
+  return total;
+}
+
 function getTotalPayroll(state) {
-  return state.clients.reduce((sum, c) =>
+  return getActiveClients(state).reduce((sum, c) =>
     sum + c.members.reduce((s, m) => s + m.share, 0), 0);
 }
 
 function getMemberEarningsThisMonth(state) {
   const earnings = {};
   state.team.forEach(t => { earnings[t.id] = 0; });
-  state.clients.forEach(c => {
+  getActiveClients(state).forEach(c => {
     c.members.forEach(m => {
       earnings[m.memberId] = (earnings[m.memberId] || 0) + m.share;
     });
@@ -279,11 +356,63 @@ function getFounderDrawsForMonth(state, monthKey) {
   }, 0);
 }
 
+function getFounderDrawsForRange(state, range) {
+  return state.founders.reduce((sum, f) => {
+    return sum + f.expenses
+      .filter(e => dateInRange(e.date, range))
+      .reduce((s, e) => s + e.amount, 0);
+  }, 0);
+}
+
 function getFounderSpentThisMonth(founder) {
   const key = getCurrentMonthKey();
   return founder.expenses
     .filter(e => e.date && e.date.startsWith(key))
     .reduce((sum, e) => sum + e.amount, 0);
+}
+
+// ─── Models / influencer helpers ─────────────────────────────
+
+function getTotalModelCostsForMonth(state, monthKey) {
+  return (state.models || []).reduce((sum, m) => {
+    return sum + (m.payments || [])
+      .filter(p => p.date && p.date.startsWith(monthKey))
+      .reduce((s, p) => s + p.amount, 0);
+  }, 0);
+}
+
+function getTotalModelCostsForRange(state, range) {
+  return (state.models || []).reduce((sum, m) => {
+    return sum + (m.payments || [])
+      .filter(p => dateInRange(p.date, range))
+      .reduce((s, p) => s + p.amount, 0);
+  }, 0);
+}
+
+// ─── Agency expense helpers ───────────────────────────────────
+
+function getTotalAgencyExpensesForRange(state, range) {
+  return (state.agencyExpenses || [])
+    .filter(e => dateInRange(e.date, range))
+    .reduce((sum, e) => sum + e.amount, 0);
+}
+
+// ─── Gross sale & profit ──────────────────────────────────────
+
+function getGrossSaleForMonth(state, monthKey) {
+  return getCollectedForMonth(state, monthKey);
+}
+
+// Total profit = gross - payroll - founder draws - model costs - agency expenses
+function getTotalProfitForRange(state, range) {
+  const gross    = getGrossSalesForRange(state, range);
+  // Payroll is monthly fixed — approximate by month count in range
+  const payroll  = getTotalPayroll(state); // per month
+  const draws    = getFounderDrawsForRange(state, range);
+  const models   = getTotalModelCostsForRange(state, range);
+  const agency   = getTotalAgencyExpensesForRange(state, range);
+  // For this month / prev month we just use 1 month of payroll
+  return gross - payroll - draws - models - agency;
 }
 
 function generateId() {
@@ -294,12 +423,32 @@ function generateId() {
 
 function getLast6MonthsChartData(state) {
   const months = getLast6MonthKeys();
-  const payroll = getTotalPayroll(state); // fixed each month
+  const payroll = getTotalPayroll(state);
   return {
-    labels: months.map(monthKeyToLabel),
-    income:   months.map(m => getCollectedForMonth(state, m)),
-    payroll:  months.map(() => payroll),
-    draws:    months.map(m => getFounderDrawsForMonth(state, m)),
+    labels:    months.map(monthKeyToLabel),
+    income:    months.map(m => getCollectedForMonth(state, m)),
+    payroll:   months.map(() => payroll),
+    draws:     months.map(m => getFounderDrawsForMonth(state, m)),
+    models:    months.map(m => getTotalModelCostsForMonth(state, m)),
     projected: months.map(() => getTotalRetainers(state)),
   };
+}
+
+// ─── Previous client financials ───────────────────────────────
+
+function getClientLifetimeRevenue(client) {
+  return client.payments
+    .filter(p => p.paid)
+    .reduce((sum, _) => sum + client.retainerAmount, 0);
+}
+
+function getClientLifetimePayroll(client) {
+  return client.members.reduce((s, m) => s + m.share, 0);
+  // This is the monthly payroll × number of paid months
+}
+
+function getClientLifetimeProfit(client) {
+  const paidMonths = client.payments.filter(p => p.paid).length;
+  const monthlyPayroll = client.members.reduce((s, m) => s + m.share, 0);
+  return (client.retainerAmount * paidMonths) - (monthlyPayroll * paidMonths);
 }

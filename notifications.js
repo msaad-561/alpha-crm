@@ -65,3 +65,54 @@ function updateNotifBadge(state) {
   const urgent = getUrgentClients(state);
   badge.classList.toggle('visible', urgent.length > 0);
 }
+
+// ─── Shared Date Filter Bar ────────────────────────────────────
+// onChange(period, customStart, customEnd)
+function buildDateFilterBar(activePeriod, custStart, custEnd, onChange) {
+  const bar = document.createElement('div');
+  bar.className = 'date-filter-bar';
+
+  const pills = [
+    { key: 'this_month',  label: 'This Month' },
+    { key: 'prev_month',  label: 'Last Month' },
+    { key: 'max',         label: 'All Time'   },
+    { key: 'custom',      label: 'Custom'     },
+  ];
+
+  pills.forEach(p => {
+    const pill = document.createElement('button');
+    pill.className = 'filter-pill' + (activePeriod === p.key ? ' active' : '');
+    pill.textContent = p.label;
+    pill.addEventListener('click', () => {
+      if (p.key !== 'custom') {
+        onChange(p.key, '', '');
+      } else {
+        onChange('custom', custStart || new Date().toISOString().split('T')[0], custEnd || new Date().toISOString().split('T')[0]);
+      }
+    });
+    bar.appendChild(pill);
+  });
+
+  // Custom date inputs
+  if (activePeriod === 'custom') {
+    const customWrap = document.createElement('div');
+    customWrap.className = 'custom-date-inputs';
+    const today = new Date().toISOString().split('T')[0];
+    customWrap.innerHTML = `
+      <input type="date" id="filter-date-start" value="${custStart || today}" />
+      <span>→</span>
+      <input type="date" id="filter-date-end" value="${custEnd || today}" />
+    `;
+    bar.appendChild(customWrap);
+
+    customWrap.querySelector('#filter-date-start').addEventListener('change', e => {
+      onChange('custom', e.target.value, custEnd || today);
+    });
+    customWrap.querySelector('#filter-date-end').addEventListener('change', e => {
+      onChange('custom', custStart || today, e.target.value);
+    });
+  }
+
+  return bar;
+}
+

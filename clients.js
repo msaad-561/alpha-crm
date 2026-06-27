@@ -1,61 +1,112 @@
 // ============================================================
-// clients.js — Clients Dashboard
+// clients.js — Clients Dashboard (v4)
+// Active / Previous tabs, client status, date filters
 // ============================================================
+
+let clientsActiveTab = 'active'; // 'active' | 'previous'
 
 // ─── Main render ─────────────────────────────────────────────
 function renderClientsPage(state, container) {
   container.innerHTML = '';
   container.className = 'fade-in';
 
-  // Alert banner
-  const banner = document.createElement('div');
-  banner.className = 'alert-banner';
-  banner.id = 'clients-alert-banner';
-  container.appendChild(banner);
-  renderAlertBanner(state, banner);
+  let cPeriod = 'this_month';
+  let cCustStart = '', cCustEnd = '';
 
-  // Metric cards
-  container.appendChild(buildClientMetrics(state));
+  function rebuild() {
+    container.innerHTML = '';
+    container.className = 'fade-in';
 
-  // Section header + table
-  const secHeader = document.createElement('div');
-  secHeader.className = 'section-header';
-  secHeader.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px">
-      <span class="section-title">Clients</span>
-      <span class="section-count">${state.clients.length}</span>
-    </div>
-  `;
-  container.appendChild(secHeader);
-  container.appendChild(buildClientTable(state));
-  // Mobile card list (shown on small screens via CSS)
-  if (typeof buildMobileClientCards === 'function') {
-    container.appendChild(buildMobileClientCards(state));
+    const range = getFilterRange(cPeriod, cCustStart, cCustEnd);
+    const activeClients   = getActiveClients(state);
+    const previousClients = getPreviousClients(state);
+
+    // ── Alert banner (active only)
+    if (clientsActiveTab === 'active') {
+      const banner = document.createElement('div');
+      banner.className = 'alert-banner';
+      banner.id = 'clients-alert-banner';
+      container.appendChild(banner);
+      renderAlertBanner(state, banner);
+    }
+
+    // ── Date filter bar
+    container.appendChild(buildDateFilterBar(cPeriod, cCustStart, cCustEnd, (p, cs, ce) => {
+      cPeriod = p; cCustStart = cs; cCustEnd = ce; rebuild();
+    }));
+
+    // ── Metric cards
+    container.appendChild(buildClientMetrics(state, range));
+
+    // ── Tabs
+    const tabs = document.createElement('div');
+    tabs.className = 'client-tabs';
+    tabs.innerHTML = `
+      <div class="client-tab ${clientsActiveTab === 'active' ? 'active' : ''}" data-tab="active" id="tab-active">
+        Active Clients <span class="client-tab-count">${activeClients.length}</span>
+      </div>
+      <div class="client-tab ${clientsActiveTab === 'previous' ? 'active' : ''}" data-tab="previous" id="tab-previous">
+        Previous Clients <span class="client-tab-count">${previousClients.length}</span>
+      </div>
+    `;
+    container.appendChild(tabs);
+
+    tabs.querySelectorAll('.client-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        clientsActiveTab = t.dataset.tab;
+        rebuild();
+      });
+    });
+
+    // ── Tab content
+    if (clientsActiveTab === 'active') {
+      // Section header
+      const secHeader = document.createElement('div');
+      secHeader.className = 'section-header';
+      secHeader.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="section-title">Active Clients</span>
+          <span class="section-count">${activeClients.length}</span>
+        </div>
+      `;
+      container.appendChild(secHeader);
+      container.appendChild(buildClientTable(state, activeClients));
+
+      if (typeof buildMobileClientCards === 'function') {
+        container.appendChild(buildMobileClientCards(state));
+      }
+
+      const twocol = document.createElement('div');
+      twocol.className = 'two-col';
+      twocol.appendChild(buildUpcomingPayments(state));
+      twocol.appendChild(buildTeamEarnings(state));
+      container.appendChild(twocol);
+
+    } else {
+      // Previous clients tab
+      buildPreviousClientsSection(state, previousClients, container, rebuild);
+    }
   }
 
-  // Bottom two-col panels
-  const twocol = document.createElement('div');
-  twocol.className = 'two-col';
-  twocol.appendChild(buildUpcomingPayments(state));
-  twocol.appendChild(buildTeamEarnings(state));
-  container.appendChild(twocol);
+  rebuild();
 }
 
 // ─── Metric cards ────────────────────────────────────────────
-function buildClientMetrics(state) {
+function buildClientMetrics(state, range) {
   const totalRetainers  = getTotalRetainers(state);
   const collected       = getCollectedThisMonth(state);
   const totalPayroll    = getTotalPayroll(state);
   const net             = totalRetainers - totalPayroll;
+  const activeClients   = getActiveClients(state);
 
   const grid = document.createElement('div');
   grid.className = 'metrics-grid';
 
   const cards = [
-    { label: 'Total Retainers',   value: formatCurrency(state, totalRetainers), sub: `${state.clients.length} active clients`, cls: 'neutral' },
-    { label: 'Collected This Month', value: formatCurrency(state, collected), sub: `${state.clients.filter(c => getClientStatus(c) === 'Paid').length} of ${state.clients.length} paid`, cls: collected >= totalRetainers ? 'positive' : 'neutral' },
+    { label: 'Total Retainers',   value: formatCurrency(state, totalRetainers), sub: `${activeClients.length} active clients`, cls: 'neutral' },
+    { label: 'Collected This Month', value: formatCurrency(state, collected), sub: `${activeClients.filter(c => getClientStatus(c) === 'Paid').length} of ${activeClients.length} paid`, cls: collected >= totalRetainers ? 'positive' : 'neutral' },
     { label: 'Total Payroll',     value: formatCurrency(state, totalPayroll), sub: `${state.team.length} team members`, cls: 'neutral' },
-    { label: 'Net After Payroll', value: formatCurrency(state, net), sub: `${Math.round((net/totalRetainers)*100) || 0}% margin`, cls: net >= 0 ? 'positive' : 'negative' },
+    { label: 'Net After Payroll', value: formatCurrency(state, net), sub: `${Math.round((totalRetainers ? (net/totalRetainers)*100 : 0))}% margin`, cls: net >= 0 ? 'positive' : 'negative' },
   ];
 
   cards.forEach(c => {
@@ -73,11 +124,11 @@ function buildClientMetrics(state) {
 }
 
 // ─── Client table ────────────────────────────────────────────
-function buildClientTable(state) {
+function buildClientTable(state, clients) {
   const wrap = document.createElement('div');
   wrap.className = 'table-card';
 
-  if (!state.clients.length) {
+  if (!clients.length) {
     wrap.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📋</div>
@@ -96,6 +147,7 @@ function buildClientTable(state) {
         <th>Retainer</th>
         <th>Team Share</th>
         <th>Next Due</th>
+        <th>Payment</th>
         <th>Status</th>
         <th>Team</th>
         <th></th>
@@ -106,14 +158,17 @@ function buildClientTable(state) {
 
   const tbody = table.querySelector('#client-tbody');
 
-  state.clients.forEach(client => {
-    const status  = getClientStatus(client);
-    const days    = getDaysUntilDue(client);
-    const dueDate = formatDueDate(client);
+  clients.forEach(client => {
+    const payStatus = getClientStatus(client);
+    const days      = getDaysUntilDue(client);
+    const dueDate   = formatDueDate(client);
     const memberShares = client.members.map(m => {
       const tm = getTeamMember(state, m.memberId);
       return tm ? `${tm.name.split(' ')[0]} ${formatCurrency(state, m.share)}` : '';
     }).join(' · ');
+
+    const cStatus = client.clientStatus || 'Active';
+    const statusBadgeHtml = `<span class="status-badge ${cStatus.toLowerCase()}"><span class="status-badge-dot"></span>${cStatus}</span>`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -128,9 +183,10 @@ function buildClientTable(state) {
       <td style="font-size:12.5px;color:var(--text-secondary);max-width:180px">${memberShares || '—'}</td>
       <td>
         <div style="font-weight:600;font-size:13.5px">${dueDate}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${daysLabel(days, status)}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${daysLabel(days, payStatus)}</div>
       </td>
-      <td>${statusPill(status)}</td>
+      <td>${statusPill(payStatus)}</td>
+      <td>${statusBadgeHtml}</td>
       <td>${buildAvatarGroup(state, client)}</td>
       <td>
         <button class="btn btn-secondary btn-sm view-client-btn" data-id="${client.id}">View</button>
@@ -138,7 +194,7 @@ function buildClientTable(state) {
     `;
 
     tr.addEventListener('click', (e) => {
-      if (e.target.closest('.view-client-btn') || e.target.tagName === 'BUTTON') {
+      if (!e.target.closest('.view-client-btn') || e.target.tagName !== 'BUTTON') {
         openClientModal(state, client.id);
       } else {
         openClientModal(state, client.id);
@@ -150,6 +206,87 @@ function buildClientTable(state) {
 
   wrap.appendChild(table);
   return wrap;
+}
+
+// ─── Previous Clients Section ─────────────────────────────────
+function buildPreviousClientsSection(state, clients, container, onUpdate) {
+  if (!clients.length) {
+    container.innerHTML += `
+      <div class="empty-state">
+        <div class="empty-state-icon">📁</div>
+        <div class="empty-state-title">No previous clients</div>
+        <p>Clients you mark as "Gone" or "Paused" will appear here with their full financial history.</p>
+      </div>`;
+    return;
+  }
+
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="section-title">Previous Clients</span>
+      <span class="section-count">${clients.length}</span>
+    </div>
+  `;
+  container.appendChild(header);
+
+  const grid = document.createElement('div');
+  grid.className = 'churn-grid';
+
+  clients.forEach(client => {
+    const paidMonths     = client.payments.filter(p => p.paid).length;
+    const totalRevenue   = getClientLifetimeRevenue(client);
+    const monthlyPayroll = client.members.reduce((s, m) => s + m.share, 0);
+    const totalPayroll   = monthlyPayroll * paidMonths;
+    const totalProfit    = totalRevenue - totalPayroll;
+    const cStatus        = client.clientStatus || 'Gone';
+
+    const card = document.createElement('div');
+    card.className = 'churn-card';
+    card.innerHTML = `
+      <div class="churn-card-header">
+        <div>
+          <div class="churn-client-name">${client.name}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${paidMonths} month${paidMonths !== 1 ? 's' : ''} active · Day ${client.startDay}/mo</div>
+        </div>
+        <span class="status-badge ${cStatus.toLowerCase()}"><span class="status-badge-dot"></span>${cStatus}</span>
+      </div>
+      <div class="churn-stats">
+        <div>
+          <div class="churn-stat-label">Revenue</div>
+          <div class="churn-stat-value">${formatCurrency(state, totalRevenue)}</div>
+        </div>
+        <div>
+          <div class="churn-stat-label">Payroll Paid</div>
+          <div class="churn-stat-value">${formatCurrency(state, totalPayroll)}</div>
+        </div>
+        <div>
+          <div class="churn-stat-label">Net Profit</div>
+          <div class="churn-stat-value ${totalProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(state, totalProfit)}</div>
+        </div>
+      </div>
+      <div class="churn-card-footer">
+        <span style="font-size:12px;color:var(--text-muted)">Retainer: ${formatCurrency(state, client.retainerAmount)}/mo</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm reactivate-btn" data-id="${client.id}">Reactivate</button>
+          <button class="btn btn-secondary btn-sm view-churn-btn" data-id="${client.id}">View</button>
+        </div>
+      </div>
+    `;
+
+    card.querySelector('.view-churn-btn').addEventListener('click', () =>
+      openClientModal(state, client.id));
+
+    card.querySelector('.reactivate-btn').addEventListener('click', () => {
+      client.clientStatus = 'Active';
+      saveState(state);
+      onUpdate();
+    });
+
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
 }
 
 function daysLabel(days, status) {
@@ -181,7 +318,7 @@ function buildUpcomingPayments(state) {
   panel.innerHTML = `<div class="panel-header">Upcoming Payments</div><div class="panel-body" id="upcoming-list"></div>`;
 
   const list = panel.querySelector('#upcoming-list');
-  const sorted = [...state.clients]
+  const sorted = [...getActiveClients(state)]
     .map(c => ({ c, days: getDaysUntilDue(c), status: getClientStatus(c) }))
     .sort((a, b) => a.days - b.days);
 
@@ -202,7 +339,7 @@ function buildUpcomingPayments(state) {
   });
 
   if (!sorted.length) {
-    list.innerHTML = '<div class="empty-state" style="padding:24px"><p>No clients</p></div>';
+    list.innerHTML = '<div class="empty-state" style="padding:24px"><p>No active clients</p></div>';
   }
 
   return panel;
@@ -257,11 +394,12 @@ function openClientModal(state, clientId) {
   const client = state.clients.find(c => c.id === clientId);
   if (!client) return;
 
-  const status  = getClientStatus(client);
-  const dueDate = formatDueDate(client);
-  const monthKey = getCurrentMonthKey();
-  const payment  = client.payments.find(p => p.month === monthKey);
-  const isPaid   = payment && payment.paid;
+  const payStatus = getClientStatus(client);
+  const dueDate   = formatDueDate(client);
+  const monthKey  = getCurrentMonthKey();
+  const payment   = client.payments.find(p => p.month === monthKey);
+  const isPaid    = payment && payment.paid;
+  const cStatus   = client.clientStatus || 'Active';
 
   const memberRows = client.members.map(m => {
     const tm = getTeamMember(state, m.memberId);
@@ -318,7 +456,7 @@ function openClientModal(state, clientId) {
           </div>
           <div class="info-group">
             <div class="info-label">Payment Status</div>
-            <div style="margin-top:4px">${statusPill(status)}</div>
+            <div style="margin-top:4px">${statusPill(payStatus)}</div>
           </div>
           <div class="info-group">
             <div class="info-label">Team Payroll</div>
@@ -330,6 +468,14 @@ function openClientModal(state, clientId) {
           <strong style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">Notes</strong><br/>
           <span style="margin-top:4px;display:block">${client.notes}</span>
         </div>` : ''}
+
+        <!-- Client Status -->
+        <div class="info-label" style="margin-bottom:10px">Client Status</div>
+        <div class="status-selector" id="status-selector" style="margin-bottom:20px">
+          <button class="status-option-btn ${cStatus === 'Active' ? 'selected-active' : ''}" data-status="Active">✅ Active</button>
+          <button class="status-option-btn ${cStatus === 'Paused' ? 'selected-paused' : ''}" data-status="Paused">⏸ Paused</button>
+          <button class="status-option-btn ${cStatus === 'Gone' ? 'selected-gone' : ''}" data-status="Gone">🚪 Gone</button>
+        </div>
 
         <div class="info-label" style="margin-bottom:10px">Team & Shares</div>
         <div class="member-share-list">${memberRows || '<p style="color:var(--text-muted);font-size:13px">No team members assigned.</p>'}</div>
@@ -365,6 +511,20 @@ function openClientModal(state, clientId) {
 
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   overlay.querySelector('#modal-close-btn').addEventListener('click', close);
+
+  // Status selector
+  overlay.querySelectorAll('.status-option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('.status-option-btn').forEach(b => {
+        b.className = 'status-option-btn';
+      });
+      const newStatus = btn.dataset.status;
+      btn.classList.add(`selected-${newStatus.toLowerCase()}`);
+      client.clientStatus = newStatus;
+      saveState(state);
+      renderPage(state); // refresh underlying page
+    });
+  });
 
   const markPaidBtn = overlay.querySelector('#mark-paid-btn');
   if (markPaidBtn) {
@@ -441,6 +601,8 @@ function openAddClientModal(state, editId = null) {
     </div>
   `).join('');
 
+  const currentStatus = editing ? (editing.clientStatus || 'Active') : 'Active';
+
   overlay.innerHTML = `
     <div class="modal">
       <div class="modal-header">
@@ -476,6 +638,13 @@ function openAddClientModal(state, editId = null) {
           </div>
         </div>
 
+        <div class="form-section-title">Client Status</div>
+        <div class="status-selector" id="add-status-selector" style="margin-bottom:16px">
+          <button type="button" class="status-option-btn ${currentStatus === 'Active' ? 'selected-active' : ''}" data-status="Active">✅ Active</button>
+          <button type="button" class="status-option-btn ${currentStatus === 'Paused' ? 'selected-paused' : ''}" data-status="Paused">⏸ Paused</button>
+          <button type="button" class="status-option-btn ${currentStatus === 'Gone' ? 'selected-gone' : ''}" data-status="Gone">🚪 Gone</button>
+        </div>
+
         <div class="form-section-title">📦 Monthly Service Plan</div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Set how many deliverables are included per month for this client.</div>
         <div class="form-grid-2" style="grid-template-columns:repeat(3,1fr)">
@@ -498,6 +667,15 @@ function openAddClientModal(state, editId = null) {
 
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add('open'));
+
+  let selectedStatus = currentStatus;
+  overlay.querySelectorAll('#add-status-selector .status-option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('#add-status-selector .status-option-btn').forEach(b => b.className = 'status-option-btn');
+      selectedStatus = btn.dataset.status;
+      btn.classList.add(`selected-${selectedStatus.toLowerCase()}`);
+    });
+  });
 
   const close = () => {
     overlay.classList.remove('open');
@@ -529,7 +707,6 @@ function openAddClientModal(state, editId = null) {
       }
     });
 
-    // Collect service plan
     const svcTypes = (state.serviceTypes && state.serviceTypes.length ? state.serviceTypes : ['Reels', 'Posts', 'Stories']);
     const newPlan = {};
     svcTypes.forEach(type => {
@@ -545,7 +722,7 @@ function openAddClientModal(state, editId = null) {
       editing.notes          = notes;
       editing.members        = members;
       editing.servicesPlan   = newPlan;
-      // Re-sync current month log to new quota
+      editing.clientStatus   = selectedStatus;
       ensureCurrentMonthLog(editing);
     } else {
       const monthKey = getCurrentMonthKey();
@@ -560,6 +737,7 @@ function openAddClientModal(state, editId = null) {
         notes,
         servicesPlan: newPlan,
         servicesLog: [],
+        clientStatus: selectedStatus,
       };
       ensureCurrentMonthLog(newClient);
       state.clients.push(newClient);

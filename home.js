@@ -1,5 +1,6 @@
 // ============================================================
-// home.js — Home Dashboard (Charts + Service Summary)
+// home.js — Home Dashboard (v4)
+// New KPIs: Gross Sale, Profit, Model Costs + date filter
 // ============================================================
 
 let homeChartInstance = null;
@@ -8,45 +9,90 @@ function renderHomePage(state, container) {
   container.innerHTML = '';
   container.className = 'fade-in';
 
-  // Quick stats row
-  container.appendChild(buildHomeQuickStats(state));
+  let hPeriod = 'this_month';
+  let hCustStart = '', hCustEnd = '';
 
-  // Chart section
-  container.appendChild(buildHomeChart(state));
+  function rebuild() {
+    container.innerHTML = '';
+    container.className = 'fade-in';
 
-  // Services summary
-  container.appendChild(buildHomeServicesSummary(state));
+    const range = getFilterRange(hPeriod, hCustStart, hCustEnd);
+
+    // Date filter bar
+    container.appendChild(buildDateFilterBar(hPeriod, hCustStart, hCustEnd, (p, cs, ce) => {
+      hPeriod = p; hCustStart = cs; hCustEnd = ce; rebuild();
+    }));
+
+    // Quick stats
+    container.appendChild(buildHomeQuickStats(state, range));
+
+    // Chart
+    container.appendChild(buildHomeChart(state));
+
+    // Services summary (active clients only)
+    container.appendChild(buildHomeServicesSummary(state));
+  }
+
+  rebuild();
 }
 
 // ─── Quick Stats ──────────────────────────────────────────────
-function buildHomeQuickStats(state) {
+function buildHomeQuickStats(state, range) {
+  const grossSales  = getGrossSalesForRange(state, range);
+  const modelCosts  = getTotalModelCostsForRange(state, range);
+  const draws       = getFounderDrawsForRange(state, range);
+  const agencyExp   = getTotalAgencyExpensesForRange(state, range);
+  const payroll     = getTotalPayroll(state); // monthly fixed
+  const totalExp    = payroll + draws + modelCosts + agencyExp;
+  const profit      = grossSales - totalExp;
+
+  const activeClients = getActiveClients(state);
+  const collected     = getCollectedThisMonth(state);
   const totalRetainers = getTotalRetainers(state);
-  const collected      = getCollectedThisMonth(state);
-  const pending        = state.clients.filter(c => getClientStatus(c) === 'Pending').length;
-  const overdue        = state.clients.filter(c => getClientStatus(c) === 'Overdue').length;
-  const payroll        = getTotalPayroll(state);
-  const draws          = getTotalFounderDraws(state);
-  const net            = collected - payroll - draws;
+  const pending  = activeClients.filter(c => getClientStatus(c) === 'Pending').length;
+  const overdue  = activeClients.filter(c => getClientStatus(c) === 'Overdue').length;
 
   const grid = document.createElement('div');
   grid.className = 'metrics-grid';
-  grid.style.marginBottom = '24px';
+  grid.style.cssText = 'margin-bottom:24px;grid-template-columns:repeat(3,1fr)';
 
   const now = new Date();
   const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const cards = [
     {
-      label: 'Monthly Revenue',
+      label: 'Total Agency Gross Sale',
+      value: formatCurrency(state, grossSales),
+      sub: `Revenue collected in period`,
+      cls: 'neutral',
+      icon: '💼',
+      highlight: true,
+    },
+    {
+      label: 'Total Profit / Earned',
+      value: formatCurrency(state, profit),
+      sub: `After all expenses`,
+      cls: profit >= 0 ? 'positive' : 'negative',
+      icon: profit >= 0 ? '📈' : '📉',
+    },
+    {
+      label: 'Models Costing',
+      value: formatCurrency(state, modelCosts),
+      sub: `Paid to models/influencers`,
+      cls: 'neutral',
+      icon: '🎭',
+    },
+    {
+      label: 'Monthly Revenue (Active)',
       value: formatCurrency(state, totalRetainers),
-      sub: `${monthName}`,
+      sub: `${activeClients.length} active clients`,
       cls: 'neutral',
       icon: '💰',
     },
     {
-      label: 'Collected So Far',
+      label: 'Collected This Month',
       value: formatCurrency(state, collected),
-      sub: `${state.clients.filter(c => getClientStatus(c) === 'Paid').length} / ${state.clients.length} clients paid`,
+      sub: `${activeClients.filter(c => getClientStatus(c) === 'Paid').length} / ${activeClients.length} clients paid`,
       cls: collected >= totalRetainers ? 'positive' : 'neutral',
       icon: '✅',
     },
@@ -57,18 +103,14 @@ function buildHomeQuickStats(state) {
       cls: overdue > 0 ? 'negative' : pending > 0 ? 'neutral' : 'positive',
       icon: overdue > 0 ? '🔴' : '⏳',
     },
-    {
-      label: 'Net Profit',
-      value: formatCurrency(state, net),
-      sub: `After payroll & draws`,
-      cls: net >= 0 ? 'positive' : 'negative',
-      icon: net >= 0 ? '📈' : '📉',
-    },
   ];
 
   cards.forEach(c => {
     const card = document.createElement('div');
     card.className = 'metric-card';
+    if (c.highlight) {
+      card.style.cssText = 'border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)';
+    }
     card.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="metric-label">${c.label}</div>
@@ -97,6 +139,7 @@ function buildHomeChart(state) {
         <span class="legend-dot" style="background:#D97706"></span><span>Collected</span>
         <span class="legend-dot" style="background:#E5E7EB"></span><span>Projected</span>
         <span class="legend-dot" style="background:#EF4444"></span><span>Expenses</span>
+        <span class="legend-dot" style="background:#8B5CF6"></span><span>Models</span>
       </div>
     </div>
     <div class="chart-wrap">
@@ -104,7 +147,6 @@ function buildHomeChart(state) {
     </div>
   `;
 
-  // Chart renders after DOM insertion — use setTimeout trick
   requestAnimationFrame(() => {
     setTimeout(() => initHomeChart(state), 50);
   });
@@ -116,14 +158,14 @@ function initHomeChart(state) {
   const canvas = document.getElementById('income-chart');
   if (!canvas) return;
   if (typeof Chart === 'undefined') {
-    canvas.parentElement.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">⚠️ Chart.js failed to load. Check your internet connection.</div>`;
+    canvas.parentElement.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">⚠️ Chart.js failed to load.</div>`;
     return;
   }
 
   if (homeChartInstance) { homeChartInstance.destroy(); homeChartInstance = null; }
 
-  const data   = getLast6MonthsChartData(state);
-  const totalExp = data.payroll.map((p, i) => p + data.draws[i]);
+  const data     = getLast6MonthsChartData(state);
+  const totalExp = data.payroll.map((p, i) => p + data.draws[i] + (data.models[i] || 0));
 
   const ctx = canvas.getContext('2d');
   homeChartInstance = new Chart(ctx, {
@@ -142,7 +184,7 @@ function initHomeChart(state) {
         {
           label: 'Projected Revenue',
           data: data.projected,
-          backgroundColor: 'rgba(229,231,235,0.6)',
+          backgroundColor: 'rgba(229,231,235,0.4)',
           borderRadius: 6,
           borderSkipped: false,
           order: 2,
@@ -152,12 +194,26 @@ function initHomeChart(state) {
           data: totalExp,
           type: 'line',
           borderColor: '#EF4444',
-          backgroundColor: 'rgba(239,68,68,0.08)',
+          backgroundColor: 'rgba(239,68,68,0.07)',
           borderWidth: 2.5,
           pointBackgroundColor: '#EF4444',
           pointRadius: 4,
           pointHoverRadius: 6,
           fill: true,
+          tension: 0.4,
+          order: 0,
+        },
+        {
+          label: 'Model Costs',
+          data: data.models,
+          type: 'line',
+          borderColor: '#8B5CF6',
+          backgroundColor: 'rgba(139,92,246,0.06)',
+          borderWidth: 2,
+          pointBackgroundColor: '#8B5CF6',
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          fill: false,
           tension: 0.4,
           order: 0,
         },
@@ -187,7 +243,7 @@ function initHomeChart(state) {
           ticks: { font: { family: 'Inter', size: 12 }, color: '#9CA3AF' },
         },
         y: {
-          grid: { color: '#F3F4F6', drawBorder: false },
+          grid: { color: 'rgba(156,163,175,0.15)', drawBorder: false },
           border: { display: false },
           ticks: {
             font: { family: 'Inter', size: 12 },
@@ -206,12 +262,14 @@ function buildHomeServicesSummary(state) {
   const wrap = document.createElement('div');
   wrap.style.marginTop = '24px';
 
+  const activeClients = getActiveClients(state);
+
   const header = document.createElement('div');
   header.className = 'section-header';
   header.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px">
       <span class="section-title">Services Progress This Month</span>
-      <span class="section-count">${state.clients.length} clients</span>
+      <span class="section-count">${activeClients.length} active clients</span>
     </div>
     <button class="btn btn-primary btn-sm" onclick="navigateTo('services')">View All →</button>
   `;
@@ -222,7 +280,7 @@ function buildHomeServicesSummary(state) {
 
   const monthKey = getCurrentMonthKey();
 
-  state.clients.forEach(client => {
+  activeClients.forEach(client => {
     const progress  = getServicesProgress(client, monthKey);
     const allTypes  = Object.keys(client.servicesPlan || {}).filter(t => client.servicesPlan[t] > 0);
     const allDone   = allTypes.every(t => progress[t] && progress[t].done >= progress[t].quota && progress[t].quota > 0);
@@ -263,8 +321,8 @@ function buildHomeServicesSummary(state) {
     grid.appendChild(card);
   });
 
-  if (!state.clients.length) {
-    grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No clients yet</div><p>Add clients to track service progress.</p></div>`;
+  if (!activeClients.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">No active clients</div><p>Add clients to track service progress.</p></div>`;
   }
 
   wrap.appendChild(grid);
