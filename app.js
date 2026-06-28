@@ -18,8 +18,9 @@ const ICONS = {
   notif:     `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>`,
   more:      `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></svg>`,
   add:       `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>`,
-  models:    `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
-  expenses:  `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`,
+  models:     `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+  expenses:   `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`,
+  statements: `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h4"/></svg>`,
 };
 
 // ─── App Boot ─────────────────────────────────────────────────
@@ -69,8 +70,9 @@ function buildShell(state) {
     </div>
     <div class="sidebar-section-label">Finance</div>
     <div class="sidebar-nav">
-      <div class="nav-item" data-page="expenses"  role="button" tabindex="0">${ICONS.expenses}<span>Expenses</span></div>
-      <div class="nav-item" data-page="models"    role="button" tabindex="0">${ICONS.models}<span>Models</span></div>
+      <div class="nav-item" data-page="statements" role="button" tabindex="0">${ICONS.statements}<span>Statements</span></div>
+      <div class="nav-item" data-page="expenses"   role="button" tabindex="0">${ICONS.expenses}<span>Expenses</span></div>
+      <div class="nav-item" data-page="models"     role="button" tabindex="0">${ICONS.models}<span>Models</span></div>
     </div>
     <div class="sidebar-section-label">Manage</div>
     <div class="sidebar-nav">
@@ -196,7 +198,7 @@ const BOTTOM_NAV_ITEMS = [
   { page: '__more',   label: 'More',     icon: 'more' },
 ];
 
-const MORE_PAGES = ['team', 'reminders', 'settings', 'models', 'expenses'];
+const MORE_PAGES = ['team', 'reminders', 'settings', 'models', 'expenses', 'statements'];
 
 function buildBottomNav() {
   const nav = document.createElement('nav');
@@ -229,6 +231,9 @@ function buildBottomNav() {
   drawer.id = 'more-drawer';
   drawer.innerHTML = `
     <div class="drawer-items">
+      <div class="drawer-item" data-page="statements" onclick="navigateTo('statements');closeMoreDrawer()">
+        ${ICONS.statements}<span>Statements</span>
+      </div>
       <div class="drawer-item" data-page="expenses" onclick="navigateTo('expenses');closeMoreDrawer()">
         ${ICONS.expenses}<span>Expenses</span>
       </div>
@@ -274,8 +279,9 @@ function navigateTo(page) {
     team:      'Team',
     reminders: 'Reminders',
     settings:  'Settings',
-    models:    'Models & Influencers',
-    expenses:  'Overall Expenses',
+    models:     'Models & Influencers',
+    expenses:   'Overall Expenses',
+    statements: 'Payment Statements',
   };
 
   // Update sidebar active
@@ -316,16 +322,17 @@ function renderPage(state) {
   if (!container) return;
 
   switch (currentPage) {
-    case 'home':      renderHomePage(state, container);      break;
-    case 'clients':   renderClientsPage(state, container);   break;
-    case 'services':  renderServicesPage(state, container);  break;
-    case 'founders':  renderFoundersPage(state, container);  break;
-    case 'team':      renderTeamPage(state, container);      break;
-    case 'reminders': renderRemindersPage(state, container); break;
-    case 'settings':  renderSettingsPage(state, container);  break;
-    case 'models':    renderModelsPage(state, container);    break;
-    case 'expenses':  renderExpensesPage(state, container);  break;
-    default:          renderHomePage(state, container);
+    case 'home':       renderHomePage(state, container);       break;
+    case 'clients':    renderClientsPage(state, container);    break;
+    case 'services':   renderServicesPage(state, container);   break;
+    case 'founders':   renderFoundersPage(state, container);   break;
+    case 'team':       renderTeamPage(state, container);       break;
+    case 'reminders':  renderRemindersPage(state, container);  break;
+    case 'settings':   renderSettingsPage(state, container);   break;
+    case 'models':     renderModelsPage(state, container);     break;
+    case 'expenses':   renderExpensesPage(state, container);   break;
+    case 'statements': renderStatementsPage(state, container); break;
+    default:           renderHomePage(state, container);
   }
 }
 
@@ -471,8 +478,14 @@ function renderRemindersPage(state, container) {
       <span class="section-title">Payment Reminders</span>
       <span class="section-count">${urgent.length} urgent</span>
     </div>
+    <button class="btn btn-secondary btn-sm" onclick="navigateTo('statements')">📄 View Statements →</button>
   `;
   container.appendChild(secHeader);
+
+  const infoNote = document.createElement('div');
+  infoNote.style.cssText = 'background:var(--bg-page);border:1px solid var(--border-light);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text-muted);margin-bottom:16px;display:flex;align-items:center;gap:8px';
+  infoNote.innerHTML = `<span>💡</span> Payments marked here are automatically recorded in <strong style="color:var(--accent);cursor:pointer" onclick="navigateTo('statements')">Statements</strong> with the date.`;
+  container.appendChild(infoNote);
 
   if (!all.length) {
     container.innerHTML += `<div class="empty-state"><div class="empty-state-icon">🔔</div><div class="empty-state-title">No reminders</div><p>Add clients to track payments.</p></div>`;

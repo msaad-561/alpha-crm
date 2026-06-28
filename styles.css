@@ -2118,3 +2118,42 @@ textarea.form-input { resize: vertical; min-height: 68px; }
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ─── Statements Page ────────────────────────────────────────── */
+.statement-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.statement-pill-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.statement-client-filter {
+  max-width: 200px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  height: auto;
+}
+
+@media (max-width: 640px) {
+  .statement-filter-bar { flex-direction: column; align-items: flex-start; }
+  .statement-client-filter { max-width: 100%; width: 100%; }
+}
+
+/* ─── btn-success (green) ────────────────────────────────────── */
+.btn-success {
+  background: var(--paid-text) !important;
+  color: #fff !important;
+  border-color: var(--paid-text) !important;
+}
+.btn-success:hover {
+  opacity: .85;
+}
