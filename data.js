@@ -24,13 +24,14 @@ const CLIENT_STATUSES = ['Active', 'Paused', 'Gone'];
 const SEED_DATA = {
   agencyName: 'Alpha Businesses CRM',
   currency: 'PKR',
-  schemaVersion: 4,
+  schemaVersion: 5,
   serviceTypes: ['Reels', 'Posts', 'Stories'],
   team: [],
   clients: [],
   founders: [],
-  models: [],          // { id, name, initials, colorIdx, payments: [] }
-  agencyExpenses: [],  // { id, description, amount, date, category }
+  models: [],             // { id, name, initials, colorIdx, payments: [] }
+  agencyExpenses: [],     // { id, description, amount, date, category }
+  overheadPayments: [],   // { id, clientId, amount, reason, date }
 };
 
 // ─── Date helpers ────────────────────────────────────────────
@@ -166,11 +167,16 @@ function initState() {
     if (!state.agencyExpenses) state.agencyExpenses = [];
     state.schemaVersion = 4;
   }
+  // v5 migration
+  if (!state.overheadPayments) state.overheadPayments = [];
+  if (state.schemaVersion < 5) state.schemaVersion = 5;
+
   // Ensure fields exist
-  if (!state.serviceTypes)   state.serviceTypes   = ['Reels', 'Posts', 'Stories'];
-  if (!state.founders)       state.founders       = [];
-  if (!state.models)         state.models         = [];
-  if (!state.agencyExpenses) state.agencyExpenses = [];
+  if (!state.serviceTypes)     state.serviceTypes     = ['Reels', 'Posts', 'Stories'];
+  if (!state.founders)         state.founders         = [];
+  if (!state.models)           state.models           = [];
+  if (!state.agencyExpenses)   state.agencyExpenses   = [];
+  if (!state.overheadPayments) state.overheadPayments = [];
 
   state.clients && state.clients.forEach(c => {
     if (!c.servicesPlan)  c.servicesPlan  = { Reels: 0, Posts: 0, Stories: 0 };

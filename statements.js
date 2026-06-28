@@ -19,6 +19,20 @@ function renderStatementsPage(state, container) {
 
     const range = getFilterRange(sPeriod, sCustStart, sCustEnd);
 
+    // ── Page header with + Add Payment
+    const pageHdr = document.createElement('div');
+    pageHdr.className = 'section-header';
+    pageHdr.style.marginBottom = '4px';
+    pageHdr.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="section-title">Payment Statements</span>
+      </div>
+      <button class="btn btn-primary btn-sm" id="add-overhead-btn">+ Add Payment</button>
+    `;
+    container.appendChild(pageHdr);
+    pageHdr.querySelector('#add-overhead-btn').addEventListener('click', () =>
+      openAddOverheadModal(state, rebuild));
+
     // ── Date filter bar
     container.appendChild(buildDateFilterBar(sPeriod, sCustStart, sCustEnd, (p, cs, ce) => {
       sPeriod = p; sCustStart = cs; sCustEnd = ce; rebuild();
@@ -80,6 +94,9 @@ function renderStatementsPage(state, container) {
         </div>`;
       container.appendChild(empty);
     }
+
+    // ── Overhead Charges section (always shown at bottom)
+    buildOverheadSection(state, range, container, rebuild);
   }
 
   rebuild();
@@ -356,3 +373,239 @@ function buildStatementSection(state, title, rows, container, onUpdate, sectionT
   section.appendChild(tableCard);
   container.appendChild(section);
 }
+
+// ─── Add Overhead Payment Modal ───────────────────────────────
+function openAddOverheadModal(state, onSave) {
+  const today = new Date().toISOString().split('T')[0];
+
+  // Build client options — all clients grouped
+  const allClients = state.clients || [];
+  const activeOpts = allClients
+    .filter(c => (c.clientStatus || 'Active') === 'Active')
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const prevOpts = allClients
+    .filter(c => c.clientStatus === 'Paused' || c.clientStatus === 'Gone')
+    .map(c => `<option value="${c.id}">${c.name} (${c.clientStatus})</option>`).join('');
+  const clientOptions = `
+    <option value="">— No specific client —</option>
+    ${activeOpts ? `<optgroup label="Active">${activeOpts}</optgroup>` : ''}
+    ${prevOpts   ? `<optgroup label="Previous / Paused">${prevOpts}</optgroup>` : ''}
+  `;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Add Overhead Payment</div>
+          <div class="modal-subtitle">Log any non-routine payment received from a client</div>
+        </div>
+        <button class="modal-close" id="oh-close">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+
+        <div class="form-group">
+          <label class="form-label" for="oh-client">Client *</label>
+          <select class="form-input" id="oh-client">
+            ${clientOptions}
+          </select>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label" for="oh-amount">Amount Received (${state.currency}) *</label>
+            <input class="form-input" type="number" id="oh-amount" placeholder="e.g. 100000" min="0" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="oh-date">Date Received *</label>
+            <input class="form-input" type="date" id="oh-date" value="${today}" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="oh-reason">Payment Name / Reason *</label>
+          <input class="form-input" type="text" id="oh-reason"
+            placeholder="e.g. Website redesign bonus, Q1 extra services" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="oh-notes">Notes (optional)</label>
+          <input class="form-input" type="text" id="oh-notes"
+            placeholder="Any additional details..." />
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="oh-cancel">Cancel</button>
+        <button class="btn btn-primary" id="oh-save">Add Payment</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+
+  const close = () => {
+    overlay.classList.remove('open');
+    setTimeout(() => overlay.remove(), 200);
+  };
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('#oh-close').addEventListener('click', close);
+  overlay.querySelector('#oh-cancel').addEventListener('click', close);
+
+  overlay.querySelector('#oh-save').addEventListener('click', () => {
+    const clientId = overlay.querySelector('#oh-client').value;
+    const amount   = parseFloat(overlay.querySelector('#oh-amount').value);
+    const date     = overlay.querySelector('#oh-date').value;
+    const reason   = overlay.querySelector('#oh-reason').value.trim();
+    const notes    = overlay.querySelector('#oh-notes').value.trim();
+
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    if (!date) {
+      alert('Please select a date.');
+      return;
+    }
+    if (!reason) {
+      alert('Please enter a payment name / reason.');
+      return;
+    }
+
+    if (!state.overheadPayments) state.overheadPayments = [];
+    state.overheadPayments.push({
+      id: generateId(),
+      clientId: clientId || null,
+      amount,
+      date,
+      reason,
+      notes: notes || null,
+    });
+
+    saveState(state);
+    close();
+    onSave();
+  });
+}
+
+// ─── Overhead Charges Section ─────────────────────────────────
+function buildOverheadSection(state, range, container, onUpdate) {
+  const all = (state.overheadPayments || [])
+    .filter(p => dateInRange(p.date, range))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // Always render the section header + Add button
+  const wrap = document.createElement('div');
+  wrap.style.marginTop = '32px';
+
+  const divider = document.createElement('hr');
+  divider.style.cssText = 'border:none;border-top:1px solid var(--border-light);margin-bottom:24px';
+  wrap.appendChild(divider);
+
+  const hdr = document.createElement('div');
+  hdr.className = 'section-header';
+  hdr.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="section-title">⚡ Overhead Charges</span>
+      <span class="section-count">${all.length}</span>
+      <span style="font-size:12px;color:var(--text-muted)">(Non-routine received payments)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:14px;font-weight:700;color:var(--paid-text)">
+        ${formatCurrency(state, all.reduce((s, p) => s + p.amount, 0))}
+      </span>
+      <button class="btn btn-primary btn-sm" id="oh-add-inline">+ Add Payment</button>
+    </div>
+  `;
+  wrap.appendChild(hdr);
+
+  hdr.querySelector('#oh-add-inline').addEventListener('click', () =>
+    openAddOverheadModal(state, onUpdate));
+
+  if (!all.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.style.padding = '24px';
+    empty.innerHTML = `
+      <div class="empty-state-icon" style="font-size:28px">⚡</div>
+      <p style="margin-top:8px">No overhead payments in this period.<br/>
+      Click <strong>+ Add Payment</strong> to log any bonus or non-retainer payment received.</p>
+    `;
+    wrap.appendChild(empty);
+    container.appendChild(wrap);
+    return;
+  }
+
+  const tableCard = document.createElement('div');
+  tableCard.className = 'table-card';
+
+  const tableWrap = document.createElement('div');
+  tableWrap.style.overflowX = 'auto';
+
+  const table = document.createElement('table');
+  table.className = 'data-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th>Payment Name / Reason</th>
+        <th>Notes</th>
+        <th>Date Received</th>
+        <th style="text-align:right">Amount</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector('tbody');
+
+  all.forEach(p => {
+    const client = (state.clients || []).find(c => c.id === p.clientId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <span style="font-weight:600;font-size:13.5px">${client ? client.name : '<span style="color:var(--text-muted)">—</span>'}</span>
+      </td>
+      <td>
+        <span style="font-weight:600;font-size:13.5px;color:var(--accent)">${p.reason}</span>
+      </td>
+      <td style="font-size:12.5px;color:var(--text-muted)">${p.notes || '—'}</td>
+      <td>
+        <span style="font-size:12.5px;font-weight:600;color:var(--paid-text)">${formatDate(p.date)}</span>
+      </td>
+      <td style="text-align:right;font-weight:800;font-size:15px;color:var(--paid-text)">
+        ${formatCurrency(state, p.amount)}
+      </td>
+      <td>
+        <button class="row-delete-btn del-oh-btn" data-id="${p.id}" title="Delete">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </button>
+      </td>
+    `;
+
+    tr.querySelector('.del-oh-btn').addEventListener('click', () => {
+      if (!confirm('Delete this overhead payment?')) return;
+      state.overheadPayments = (state.overheadPayments || []).filter(x => x.id !== p.id);
+      saveState(state);
+      onUpdate();
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  tableWrap.appendChild(table);
+  tableCard.appendChild(tableWrap);
+  wrap.appendChild(tableCard);
+  container.appendChild(wrap);
+}
+
