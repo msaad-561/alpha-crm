@@ -2157,3 +2157,117 @@ textarea.form-input { resize: vertical; min-height: 68px; }
 .btn-success:hover {
   opacity: .85;
 }
+
+/* --------------------------------------------------------------
+   Statement Cards — mobile-first flex layout
+   -------------------------------------------------------------- */
+
+/* Filter bar */
+.statement-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.statement-pill-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.statement-client-filter {
+  max-width: 200px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  height: auto;
+}
+
+/* Each payment row — desktop: horizontal, mobile: stacked card */
+.stmt-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-light);
+}
+.stmt-card:last-child { border-bottom: none; }
+
+/* Left: info block */
+.stmt-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.stmt-card-client {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.stmt-card-name {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.stmt-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.stmt-received-label {
+  color: var(--paid-text);
+  font-weight: 600;
+}
+.stmt-client-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--bg-page);
+  color: var(--text-muted);
+}
+
+/* Right: amount + action */
+.stmt-card-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Amount colours */
+.stmt-amt-paid    { font-weight: 800; font-size: 15px; color: var(--paid-text); white-space: nowrap; }
+.stmt-amt-overdue { font-weight: 800; font-size: 15px; color: var(--overdue-text); white-space: nowrap; }
+.stmt-amt-pending { font-weight: 800; font-size: 15px; color: var(--accent); white-space: nowrap; }
+
+/* -- Mobile breakpoint ----------------------- */
+@media (max-width: 640px) {
+  .statement-filter-bar { flex-direction: column; align-items: flex-start; }
+  .statement-client-filter { max-width: 100%; width: 100%; }
+
+  .stmt-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .stmt-card-body { width: 100%; }
+
+  .stmt-card-name { max-width: 100%; white-space: normal; }
+
+  /* Amount + actions fill the full width, space-between */
+  .stmt-card-right {
+    width: 100%;
+    justify-content: space-between;
+    border-top: 1px solid var(--border-light);
+    padding-top: 10px;
+    margin-top: 2px;
+  }
+
+  .stmt-amt-paid,
+  .stmt-amt-overdue,
+  .stmt-amt-pending {
+    font-size: 17px;
+  }
+}

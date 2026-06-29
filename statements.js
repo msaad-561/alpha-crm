@@ -1,7 +1,6 @@
 // ============================================================
 // statements.js — Payment Statements Page
-// Shows all client payments received with full history
-// Linked to Reminders for pending/overdue follow-up
+// Mobile-optimised card layout + Overhead Charges section
 // ============================================================
 
 function renderStatementsPage(state, container) {
@@ -10,8 +9,8 @@ function renderStatementsPage(state, container) {
 
   let sPeriod = 'this_month';
   let sCustStart = '', sCustEnd = '';
-  let filterStatus = 'all';   // 'all' | 'paid' | 'pending' | 'overdue'
-  let filterClient = 'all';   // 'all' | clientId
+  let filterStatus = 'all';
+  let filterClient = 'all';
 
   function rebuild() {
     container.innerHTML = '';
@@ -19,7 +18,7 @@ function renderStatementsPage(state, container) {
 
     const range = getFilterRange(sPeriod, sCustStart, sCustEnd);
 
-    // ── Page header with + Add Payment
+    // ── Page header
     const pageHdr = document.createElement('div');
     pageHdr.className = 'section-header';
     pageHdr.style.marginBottom = '4px';
@@ -82,7 +81,7 @@ function renderStatementsPage(state, container) {
       container.appendChild(empty);
     }
 
-    // ── Overhead Charges section — always shows ALL payments (no date filter)
+    // ── Overhead Charges section (always shown, no date filter)
     buildOverheadSection(state, null, container, rebuild);
   }
 
@@ -150,10 +149,10 @@ function buildStatementMetrics(state, rows) {
   grid.style.marginBottom = '20px';
 
   [
-    { label: 'Total Received',  value: formatCurrency(state, totalReceived), sub: `${paidCount} confirmed`,        cls: 'positive', icon: '✅', highlight: true },
-    { label: 'Pending',         value: formatCurrency(state, totalPending),  sub: `${pendingCount} awaiting`,      cls: 'neutral',  icon: '⏳' },
-    { label: 'Overdue',         value: formatCurrency(state, totalOverdue),  sub: `${overdueCount} past due`,      cls: overdueCount > 0 ? 'negative' : 'neutral', icon: overdueCount > 0 ? '🔴' : '🟢' },
-    { label: 'Total Expected',  value: formatCurrency(state, totalExpected), sub: `${rows.length} total entries`,  cls: 'neutral',  icon: '💼' },
+    { label: 'Total Received',  value: formatCurrency(state, totalReceived), sub: `${paidCount} confirmed`,       cls: 'positive', icon: '✅', highlight: true },
+    { label: 'Pending',         value: formatCurrency(state, totalPending),  sub: `${pendingCount} awaiting`,     cls: 'neutral',  icon: '⏳' },
+    { label: 'Overdue',         value: formatCurrency(state, totalOverdue),  sub: `${overdueCount} past due`,     cls: overdueCount > 0 ? 'negative' : 'neutral', icon: overdueCount > 0 ? '🔴' : '🟢' },
+    { label: 'Total Expected',  value: formatCurrency(state, totalExpected), sub: `${rows.length} total entries`, cls: 'neutral',  icon: '💼' },
   ].forEach(c => {
     const card = document.createElement('div');
     card.className = 'metric-card';
@@ -205,14 +204,14 @@ function buildStatementFilters(state, activeStatus, activeClient, onChange) {
   const reminderBtn = document.createElement('button');
   reminderBtn.className = 'btn btn-secondary btn-sm';
   reminderBtn.style.marginLeft = 'auto';
-  reminderBtn.innerHTML = `🔔 View Reminders`;
+  reminderBtn.innerHTML = `🔔 Reminders`;
   reminderBtn.addEventListener('click', () => navigateTo('reminders'));
   bar.appendChild(reminderBtn);
 
   return bar;
 }
 
-// ─── Statement Section (overdue / pending / paid) ─────────────
+// ─── Statement Section ─ mobile card layout ───────────────────
 function buildStatementSection(state, title, rows, container, onUpdate, sectionType) {
   const section = document.createElement('div');
   section.style.marginBottom = '28px';
@@ -231,34 +230,10 @@ function buildStatementSection(state, title, rows, container, onUpdate, sectionT
   `;
   section.appendChild(hdr);
 
-  const tableCard = document.createElement('div');
-  tableCard.className = 'table-card';
-  const tableWrap = document.createElement('div');
-  tableWrap.style.overflowX = 'auto';
-
-  const table = document.createElement('table');
-  table.className = 'data-table';
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>Client</th>
-        <th>Period</th>
-        <th>Type</th>
-        <th>Amount</th>
-        <th>Due Date</th>
-        <th>Status</th>
-        <th>Date Received</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  `;
-
-  const tbody = table.querySelector('tbody');
+  const wrap = document.createElement('div');
+  wrap.className = 'table-card';
 
   rows.forEach(row => {
-    const tr = document.createElement('tr');
-
     const statusPill = row.status === 'paid'
       ? `<span class="pill paid"><span class="pill-dot"></span>Paid</span>`
       : row.status === 'overdue'
@@ -266,31 +241,44 @@ function buildStatementSection(state, title, rows, container, onUpdate, sectionT
         : `<span class="pill pending"><span class="pill-dot"></span>Pending</span>`;
 
     const clientBadge = row.clientStatus !== 'Active'
-      ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg-page);color:var(--text-muted);margin-left:4px">${row.clientStatus}</span>`
+      ? `<span class="stmt-client-badge">${row.clientStatus}</span>`
       : '';
 
-    tr.innerHTML = `
-      <td>
-        <div style="font-weight:600;font-size:14px">${row.clientName}${clientBadge}</div>
-        <div style="font-size:11.5px;color:var(--text-muted)">${row.paymentType === 'one-time' ? '🔁 One-Time' : '🔄 Retainer'}</div>
-      </td>
-      <td style="font-size:13px;font-weight:500">${row.monthLabel}</td>
-      <td><span class="expense-category-chip expense-cat-${row.paymentType === 'one-time' ? 'model' : 'payroll'}">${row.paymentType === 'one-time' ? 'One-Time' : 'Monthly'}</span></td>
-      <td style="font-weight:700;font-size:15px">${formatCurrency(state, row.amount)}</td>
-      <td style="font-size:12.5px;color:var(--text-muted)">${formatDate(row.dueDate)}</td>
-      <td>${statusPill}</td>
-      <td style="font-size:13px;color:${row.paidDate ? 'var(--paid-text)' : 'var(--text-muted)'}">
-        ${row.paidDate ? `<strong>${formatDate(row.paidDate)}</strong>` : '—'}
-      </td>
-      <td>
+    const typeChip = `<span class="expense-category-chip expense-cat-${row.paymentType === 'one-time' ? 'model' : 'payroll'}">${row.paymentType === 'one-time' ? 'One-Time' : 'Monthly'}</span>`;
+
+    const amtCls = sectionType === 'overdue' ? 'stmt-amt-overdue'
+                 : sectionType === 'paid'    ? 'stmt-amt-paid'
+                 : 'stmt-amt-pending';
+
+    const item = document.createElement('div');
+    item.className = 'stmt-card';
+    item.innerHTML = `
+      <div class="stmt-card-body">
+        <div class="stmt-card-client">
+          <span class="stmt-card-name">${row.clientName}</span>
+          ${clientBadge}
+          ${statusPill}
+        </div>
+        <div class="stmt-card-sub">
+          ${row.monthLabel} · ${typeChip}
+        </div>
+        <div class="stmt-card-sub">
+          Due&nbsp;<strong>${formatDate(row.dueDate)}</strong>
+          ${row.paidDate
+            ? `&nbsp;·&nbsp;<span class="stmt-received-label">✅ Received ${formatDate(row.paidDate)}</span>`
+            : ''}
+        </div>
+      </div>
+      <div class="stmt-card-right">
+        <div class="${amtCls}">${formatCurrency(state, row.amount)}</div>
         ${row.status !== 'paid'
-          ? `<button class="btn btn-success btn-sm mark-paid-stmt-btn">Mark Paid</button>`
-          : `<button class="btn btn-secondary btn-sm mark-unpaid-stmt-btn" style="opacity:.7">Undo</button>`
+          ? `<button class="btn btn-success btn-sm mark-paid-stmt-btn">✅ Mark Paid</button>`
+          : `<button class="btn btn-secondary btn-sm mark-unpaid-stmt-btn" style="opacity:.7;font-size:11px">Undo</button>`
         }
-      </td>
+      </div>
     `;
 
-    const markPaidBtn = tr.querySelector('.mark-paid-stmt-btn');
+    const markPaidBtn = item.querySelector('.mark-paid-stmt-btn');
     if (markPaidBtn) {
       markPaidBtn.addEventListener('click', () => {
         const now = new Date();
@@ -302,7 +290,7 @@ function buildStatementSection(state, title, rows, container, onUpdate, sectionT
       });
     }
 
-    const markUnpaidBtn = tr.querySelector('.mark-unpaid-stmt-btn');
+    const markUnpaidBtn = item.querySelector('.mark-unpaid-stmt-btn');
     if (markUnpaidBtn) {
       markUnpaidBtn.addEventListener('click', () => {
         if (!confirm('Mark this payment as unpaid?')) return;
@@ -313,17 +301,14 @@ function buildStatementSection(state, title, rows, container, onUpdate, sectionT
       });
     }
 
-    tbody.appendChild(tr);
+    wrap.appendChild(item);
   });
 
-  tableWrap.appendChild(table);
-  tableCard.appendChild(tableWrap);
-  section.appendChild(tableCard);
+  section.appendChild(wrap);
   container.appendChild(section);
 }
 
 // ─── Add / Edit Overhead Payment Modal ───────────────────────
-// existingPayment: pass to open in EDIT mode, null/undefined = ADD mode
 function openAddOverheadModal(state, onSave, existingPayment) {
   const isEdit = !!existingPayment;
   const today  = new Date().toISOString().split('T')[0];
@@ -427,7 +412,6 @@ function openAddOverheadModal(state, onSave, existingPayment) {
   overlay.querySelector('#oh-close').addEventListener('click', close);
   overlay.querySelector('#oh-cancel').addEventListener('click', close);
 
-  // Delete button (edit mode only)
   const delBtn = overlay.querySelector('#oh-delete');
   if (delBtn) {
     delBtn.addEventListener('click', () => {
@@ -467,22 +451,18 @@ function openAddOverheadModal(state, onSave, existingPayment) {
     if (!live.overheadPayments) live.overheadPayments = [];
 
     if (isEdit) {
-      // UPDATE existing entry in place
       const idx = live.overheadPayments.findIndex(x => x.id === existingPayment.id);
       if (idx !== -1) {
         live.overheadPayments[idx] = {
           ...live.overheadPayments[idx],
           clientId: clientId || null,
-          amount,
-          date,
-          reason,
+          amount, date, reason,
           notes:    notes || null,
           paid:     selectedStatus === 'paid',
           paidDate: selectedStatus === 'paid' ? (live.overheadPayments[idx].paidDate || date) : null,
         };
       }
     } else {
-      // ADD new entry — guard against double-click duplicate
       const isDuplicate = live.overheadPayments.some(x =>
         x.reason === reason && x.amount === amount && x.date === date && x.clientId === (clientId || null)
       );
@@ -490,9 +470,7 @@ function openAddOverheadModal(state, onSave, existingPayment) {
         live.overheadPayments.push({
           id:       generateId(),
           clientId: clientId || null,
-          amount,
-          date,
-          reason,
+          amount, date, reason,
           notes:    notes || null,
           paid:     selectedStatus === 'paid',
           paidDate: selectedStatus === 'paid' ? date : null,
@@ -509,13 +487,11 @@ function openAddOverheadModal(state, onSave, existingPayment) {
 // ─── Overhead Charges Section ─────────────────────────────────
 function buildOverheadSection(state, range, container, onUpdate) {
   const liveState = window.__agencyState || state;
-  // No date filter — always show ALL overhead payments
   const all = (liveState.overheadPayments || [])
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const unpaid = all.filter(p => !p.paid);
   const paid   = all.filter(p =>  p.paid);
-
   const totalPending  = unpaid.reduce((s, p) => s + p.amount, 0);
   const totalReceived = paid.reduce((s, p) => s + p.amount, 0);
 
@@ -528,14 +504,13 @@ function buildOverheadSection(state, range, container, onUpdate) {
 
   const refresh = () => renderPage(window.__agencyState);
 
-  // Section header
   const hdr = document.createElement('div');
   hdr.className = 'section-header';
   hdr.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span class="section-title">⚡ Overhead Charges</span>
       <span class="section-count">${all.length}</span>
-      <span style="font-size:11px;color:var(--text-muted)">(Non-routine payments · all time)</span>
+      <span style="font-size:11px;color:var(--text-muted)">(Non-routine · all time)</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       ${unpaid.length ? `<span style="font-size:12px;color:var(--overdue-text);font-weight:600">⏳ ${formatCurrency(liveState, totalPending)} pending</span>` : ''}
@@ -561,12 +536,12 @@ function buildOverheadSection(state, range, container, onUpdate) {
     return;
   }
 
-  // ── Unpaid block
+  // ── Unpaid / Pending block
   if (unpaid.length) {
-    const unpaidLabel = document.createElement('div');
-    unpaidLabel.style.cssText = 'font-size:12px;font-weight:700;color:var(--overdue-text);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px';
-    unpaidLabel.textContent = `⏳ Unpaid / Pending — ${formatCurrency(liveState, totalPending)}`;
-    wrap.appendChild(unpaidLabel);
+    const ul = document.createElement('div');
+    ul.style.cssText = 'font-size:12px;font-weight:700;color:var(--overdue-text);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px';
+    ul.textContent = `⏳ Unpaid / Pending — ${formatCurrency(liveState, totalPending)}`;
+    wrap.appendChild(ul);
 
     const unpaidCard = document.createElement('div');
     unpaidCard.className = 'table-card';
@@ -575,23 +550,29 @@ function buildOverheadSection(state, range, container, onUpdate) {
     unpaid.forEach(p => {
       const client = (liveState.clients || []).find(c => c.id === p.clientId);
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border-light);flex-wrap:wrap';
+      row.className = 'stmt-card';
       row.innerHTML = `
-        <span class="pill overdue"><span class="pill-dot"></span>Unpaid</span>
-        <div style="flex:1;min-width:120px">
-          <div style="font-weight:700;font-size:13.5px;color:var(--accent)">${p.reason}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${client ? client.name : 'No client'} · Due ${formatDate(p.date)}</div>
-          ${p.notes ? `<div style="font-size:11.5px;color:var(--text-muted);margin-top:2px">${p.notes}</div>` : ''}
+        <div class="stmt-card-body">
+          <div class="stmt-card-client">
+            <span class="stmt-card-name">${p.reason}</span>
+            <span class="pill overdue"><span class="pill-dot"></span>Unpaid</span>
+          </div>
+          <div class="stmt-card-sub">
+            ${client ? client.name : 'No client'} · Due ${formatDate(p.date)}
+          </div>
+          ${p.notes ? `<div class="stmt-card-sub">${p.notes}</div>` : ''}
         </div>
-        <span style="font-weight:800;font-size:16px;color:var(--overdue-text)">${formatCurrency(liveState, p.amount)}</span>
-        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-          <button class="btn btn-success btn-sm mark-oh-paid-btn">✅ Mark Paid</button>
-          <button class="btn btn-secondary btn-sm edit-oh-btn" title="Edit">✏️</button>
-          <button class="row-delete-btn del-oh-btn" title="Delete">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-            </svg>
-          </button>
+        <div class="stmt-card-right">
+          <div class="stmt-amt-overdue">${formatCurrency(liveState, p.amount)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-success btn-sm mark-oh-paid-btn">✅ Mark Paid</button>
+            <button class="btn btn-secondary btn-sm edit-oh-btn">✏️</button>
+            <button class="row-delete-btn del-oh-btn" title="Delete">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
         </div>
       `;
 
@@ -601,20 +582,15 @@ function buildOverheadSection(state, range, container, onUpdate) {
         const live = window.__agencyState;
         const entry = (live.overheadPayments || []).find(x => x.id === p.id);
         if (entry) { entry.paid = true; entry.paidDate = ds; }
-        saveState(live);
-        renderPage(live);
+        saveState(live); renderPage(live);
       });
-
-      row.querySelector('.edit-oh-btn').addEventListener('click', () => {
-        openAddOverheadModal(window.__agencyState || state, refresh, p);
-      });
-
+      row.querySelector('.edit-oh-btn').addEventListener('click', () =>
+        openAddOverheadModal(window.__agencyState || state, refresh, p));
       row.querySelector('.del-oh-btn').addEventListener('click', () => {
         if (!confirm('Delete this overhead payment?')) return;
         const live = window.__agencyState;
         live.overheadPayments = (live.overheadPayments || []).filter(x => x.id !== p.id);
-        saveState(live);
-        renderPage(live);
+        saveState(live); renderPage(live);
       });
 
       unpaidCard.appendChild(row);
@@ -624,81 +600,61 @@ function buildOverheadSection(state, range, container, onUpdate) {
 
   // ── Paid / Received block
   if (paid.length) {
-    const paidLabel = document.createElement('div');
-    paidLabel.style.cssText = 'font-size:12px;font-weight:700;color:var(--paid-text);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px';
-    paidLabel.textContent = `✅ Received — ${formatCurrency(liveState, totalReceived)}`;
-    wrap.appendChild(paidLabel);
+    const pl = document.createElement('div');
+    pl.style.cssText = 'font-size:12px;font-weight:700;color:var(--paid-text);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px';
+    pl.textContent = `✅ Received — ${formatCurrency(liveState, totalReceived)}`;
+    wrap.appendChild(pl);
 
     const paidCard = document.createElement('div');
     paidCard.className = 'table-card';
-    const tableWrap = document.createElement('div');
-    tableWrap.style.overflowX = 'auto';
-
-    const table = document.createElement('table');
-    table.className = 'data-table';
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Client</th>
-          <th>Payment Name / Reason</th>
-          <th>Notes</th>
-          <th>Date Received</th>
-          <th style="text-align:right">Amount</th>
-          <th style="text-align:center">Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    `;
-    const tbody = table.querySelector('tbody');
 
     paid.forEach(p => {
       const client = (liveState.clients || []).find(c => c.id === p.clientId);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span style="font-weight:600;font-size:13.5px">${client ? client.name : '<span style="color:var(--text-muted)">—</span>'}</span></td>
-        <td><span style="font-weight:600;font-size:13.5px;color:var(--accent)">${p.reason}</span></td>
-        <td style="font-size:12.5px;color:var(--text-muted)">${p.notes || '—'}</td>
-        <td><span style="font-size:12.5px;font-weight:600;color:var(--paid-text)">${formatDate(p.paidDate || p.date)}</span></td>
-        <td style="text-align:right;font-weight:800;font-size:15px;color:var(--paid-text)">${formatCurrency(liveState, p.amount)}</td>
-        <td style="text-align:center">
-          <div style="display:flex;gap:6px;align-items:center;justify-content:center">
-            <button class="btn btn-secondary btn-sm edit-oh-btn" title="Edit">✏️ Edit</button>
-            <button class="btn btn-secondary btn-sm undo-oh-btn" style="font-size:11px;opacity:.7" title="Mark as unpaid">Undo</button>
+      const row = document.createElement('div');
+      row.className = 'stmt-card';
+      row.innerHTML = `
+        <div class="stmt-card-body">
+          <div class="stmt-card-client">
+            <span class="stmt-card-name">${p.reason}</span>
+            <span class="pill paid"><span class="pill-dot"></span>Received</span>
+          </div>
+          <div class="stmt-card-sub">
+            ${client ? client.name : '—'} · ${formatDate(p.paidDate || p.date)}
+          </div>
+          ${p.notes ? `<div class="stmt-card-sub">${p.notes}</div>` : ''}
+        </div>
+        <div class="stmt-card-right">
+          <div class="stmt-amt-paid">${formatCurrency(liveState, p.amount)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="btn btn-secondary btn-sm edit-oh-btn">✏️ Edit</button>
+            <button class="btn btn-secondary btn-sm undo-oh-btn" style="opacity:.7;font-size:11px">Undo</button>
             <button class="row-delete-btn del-oh-btn" title="Delete">
               <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
             </button>
           </div>
-        </td>
+        </div>
       `;
 
-      tr.querySelector('.edit-oh-btn').addEventListener('click', () => {
-        openAddOverheadModal(window.__agencyState || state, refresh, p);
-      });
-
-      tr.querySelector('.undo-oh-btn').addEventListener('click', () => {
+      row.querySelector('.edit-oh-btn').addEventListener('click', () =>
+        openAddOverheadModal(window.__agencyState || state, refresh, p));
+      row.querySelector('.undo-oh-btn').addEventListener('click', () => {
         if (!confirm('Mark this as unpaid?')) return;
         const live = window.__agencyState;
         const entry = (live.overheadPayments || []).find(x => x.id === p.id);
         if (entry) { entry.paid = false; entry.paidDate = null; }
-        saveState(live);
-        renderPage(live);
+        saveState(live); renderPage(live);
       });
-
-      tr.querySelector('.del-oh-btn').addEventListener('click', () => {
+      row.querySelector('.del-oh-btn').addEventListener('click', () => {
         if (!confirm('Delete this overhead payment?')) return;
         const live = window.__agencyState;
         live.overheadPayments = (live.overheadPayments || []).filter(x => x.id !== p.id);
-        saveState(live);
-        renderPage(live);
+        saveState(live); renderPage(live);
       });
 
-      tbody.appendChild(tr);
+      paidCard.appendChild(row);
     });
-
-    tableWrap.appendChild(table);
-    paidCard.appendChild(tableWrap);
     wrap.appendChild(paidCard);
   }
 
