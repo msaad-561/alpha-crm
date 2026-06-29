@@ -231,7 +231,7 @@ function buildStatementSection(state, title, rows, container, onUpdate, sectionT
   section.appendChild(hdr);
 
   const wrap = document.createElement('div');
-  wrap.className = 'table-card';
+  wrap.className = 'table-card stmt-table-card';
 
   rows.forEach(row => {
     const statusPill = row.status === 'paid'
@@ -544,7 +544,7 @@ function buildOverheadSection(state, range, container, onUpdate) {
     wrap.appendChild(ul);
 
     const unpaidCard = document.createElement('div');
-    unpaidCard.className = 'table-card';
+    unpaidCard.className = 'table-card stmt-table-card';
     unpaidCard.style.marginBottom = '20px';
 
     unpaid.forEach(p => {
@@ -606,7 +606,7 @@ function buildOverheadSection(state, range, container, onUpdate) {
     wrap.appendChild(pl);
 
     const paidCard = document.createElement('div');
-    paidCard.className = 'table-card';
+    paidCard.className = 'table-card stmt-table-card';
 
     paid.forEach(p => {
       const client = (liveState.clients || []).find(c => c.id === p.clientId);

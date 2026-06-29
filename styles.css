@@ -1349,6 +1349,8 @@ textarea.form-input { resize: vertical; min-height: 68px; }
   /* Hide desktop table, show mobile cards */
   .table-card { display: none; }
   .client-mobile-cards { display: flex; }
+  /* Statements page keeps its own card container visible */
+  .stmt-table-card { display: block !important; }
 
   .home-services-grid { grid-template-columns: 1fr; }
 
@@ -2271,3 +2273,6 @@ textarea.form-input { resize: vertical; min-height: 68px; }
     font-size: 17px;
   }
 }
+
+/* Statements-specific card container — never hidden by mobile rules */
+.stmt-table-card { display: block; }
