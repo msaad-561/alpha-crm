@@ -84,6 +84,12 @@ function subscribeToFirestore() {
       _lastSavedJSON = incomingJSON;
 
       const freshState = snap.data();
+      // Apply missing field migrations
+      if (!freshState.overheadPayments) freshState.overheadPayments = [];
+      if (!freshState.models)           freshState.models           = [];
+      if (!freshState.agencyExpenses)   freshState.agencyExpenses   = [];
+      if (!freshState.serviceTypes)     freshState.serviceTypes     = ['Reels', 'Posts', 'Stories'];
+      if (!freshState.founders)         freshState.founders         = [];
       window.__agencyState = freshState;
 
       // Cache locally too
@@ -143,7 +149,13 @@ async function bootWithFirebase() {
       updateNotifBadge(freshState);
       showSyncBadge('saved');
     } else {
-      // Firestore has current schema data — use it
+      // Firestore has current schema data — apply any missing field migrations then use it
+      if (!fsState.overheadPayments) fsState.overheadPayments = [];
+      if (!fsState.models)           fsState.models           = [];
+      if (!fsState.agencyExpenses)   fsState.agencyExpenses   = [];
+      if (!fsState.serviceTypes)     fsState.serviceTypes     = ['Reels', 'Posts', 'Stories'];
+      if (!fsState.founders)         fsState.founders         = [];
+      if (fsState.schemaVersion < 5) fsState.schemaVersion    = 5;
       _lastSavedJSON = JSON.stringify(fsState);
       window.__agencyState = fsState;
       saveStateLocal(fsState);
