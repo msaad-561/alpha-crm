@@ -31,7 +31,7 @@ function renderStatementsPage(state, container) {
     `;
     container.appendChild(pageHdr);
     pageHdr.querySelector('#add-overhead-btn').addEventListener('click', () =>
-      openAddOverheadModal(state, rebuild));
+      openAddOverheadModal(window.__agencyState || state, () => renderPage(window.__agencyState)));
 
     // ── Date filter bar
     container.appendChild(buildDateFilterBar(sPeriod, sCustStart, sCustEnd, (p, cs, ce) => {
@@ -82,8 +82,8 @@ function renderStatementsPage(state, container) {
       container.appendChild(empty);
     }
 
-    // ── Overhead Charges section (always shown at bottom)
-    buildOverheadSection(state, range, container, rebuild);
+    // ── Overhead Charges section — always shows ALL payments (no date filter)
+    buildOverheadSection(state, null, container, rebuild);
   }
 
   rebuild();
@@ -446,7 +446,10 @@ function openAddOverheadModal(state, onSave) {
     if (!reason) { alert('Please enter a payment name / reason.'); return; }
 
     if (!state.overheadPayments) state.overheadPayments = [];
-    state.overheadPayments.push({
+    // Always write to the live global state to avoid stale closure issues
+    const liveState = window.__agencyState || state;
+    if (!liveState.overheadPayments) liveState.overheadPayments = [];
+    liveState.overheadPayments.push({
       id:       generateId(),
       clientId: clientId || null,
       amount,
@@ -457,7 +460,7 @@ function openAddOverheadModal(state, onSave) {
       paidDate: selectedStatus === 'paid' ? date : null,
     });
 
-    saveState(state);
+    saveState(liveState);
     close();
     onSave();
   });
@@ -499,7 +502,7 @@ function buildOverheadSection(state, range, container, onUpdate) {
   `;
   wrap.appendChild(hdr);
   hdr.querySelector('#oh-add-inline').addEventListener('click', () =>
-    openAddOverheadModal(state, onUpdate));
+    openAddOverheadModal(window.__agencyState || state, () => renderPage(window.__agencyState)));
 
   if (!all.length) {
     const empty = document.createElement('div');
@@ -549,17 +552,19 @@ function buildOverheadSection(state, range, container, onUpdate) {
       row.querySelector('.mark-oh-paid-btn').addEventListener('click', () => {
         const now = new Date();
         const ds = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-        const entry = (state.overheadPayments || []).find(x => x.id === p.id);
+        const live = window.__agencyState;
+        const entry = (live.overheadPayments || []).find(x => x.id === p.id);
         if (entry) { entry.paid = true; entry.paidDate = ds; }
-        saveState(state);
-        onUpdate();
+        saveState(live);
+        renderPage(live);
       });
 
       row.querySelector('.del-oh-btn').addEventListener('click', () => {
         if (!confirm('Delete this overhead payment?')) return;
-        state.overheadPayments = (state.overheadPayments || []).filter(x => x.id !== p.id);
-        saveState(state);
-        onUpdate();
+        const live = window.__agencyState;
+        live.overheadPayments = (live.overheadPayments || []).filter(x => x.id !== p.id);
+        saveState(live);
+        renderPage(live);
       });
 
       unpaidCard.appendChild(row);
@@ -617,17 +622,19 @@ function buildOverheadSection(state, range, container, onUpdate) {
 
       tr.querySelector('.undo-oh-btn').addEventListener('click', () => {
         if (!confirm('Mark this as unpaid?')) return;
-        const entry = (state.overheadPayments || []).find(x => x.id === p.id);
+        const live = window.__agencyState;
+        const entry = (live.overheadPayments || []).find(x => x.id === p.id);
         if (entry) { entry.paid = false; entry.paidDate = null; }
-        saveState(state);
-        onUpdate();
+        saveState(live);
+        renderPage(live);
       });
 
       tr.querySelector('.del-oh-btn').addEventListener('click', () => {
         if (!confirm('Delete this overhead payment?')) return;
-        state.overheadPayments = (state.overheadPayments || []).filter(x => x.id !== p.id);
-        saveState(state);
-        onUpdate();
+        const live = window.__agencyState;
+        live.overheadPayments = (live.overheadPayments || []).filter(x => x.id !== p.id);
+        saveState(live);
+        renderPage(live);
       });
 
       tbody.appendChild(tr);
