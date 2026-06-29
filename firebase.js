@@ -86,6 +86,7 @@ function subscribeToFirestore() {
       const freshState = snap.data();
       // Apply missing field migrations
       if (!freshState.overheadPayments) freshState.overheadPayments = [];
+      if (!freshState.memberPayments)   freshState.memberPayments   = [];
       if (!freshState.models)           freshState.models           = [];
       if (!freshState.agencyExpenses)   freshState.agencyExpenses   = [];
       if (!freshState.serviceTypes)     freshState.serviceTypes     = ['Reels', 'Posts', 'Stories'];
@@ -151,6 +152,7 @@ async function bootWithFirebase() {
     } else {
       // Firestore has current schema data — apply any missing field migrations then use it
       if (!fsState.overheadPayments) fsState.overheadPayments = [];
+      if (!fsState.memberPayments)   fsState.memberPayments   = [];
       if (!fsState.models)           fsState.models           = [];
       if (!fsState.agencyExpenses)   fsState.agencyExpenses   = [];
       if (!fsState.serviceTypes)     fsState.serviceTypes     = ['Reels', 'Posts', 'Stories'];

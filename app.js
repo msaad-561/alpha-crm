@@ -327,6 +327,7 @@ function renderPage(state) {
     case 'services':   renderServicesPage(state, container);   break;
     case 'founders':   renderFoundersPage(state, container);   break;
     case 'team':       renderTeamPage(state, container);       break;
+    case 'team-member': renderTeamMemberDetail(state, window.__currentMemberId, container); break;
     case 'reminders':  renderRemindersPage(state, container);  break;
     case 'settings':   renderSettingsPage(state, container);   break;
     case 'models':     renderModelsPage(state, container);     break;
@@ -365,7 +366,8 @@ function renderTeamPage(state, container) {
     const c = getAvatarColor(tm.colorIdx);
     const clientCount = state.clients.filter(c => c.members.some(m => m.memberId === tm.id)).length;
     const card = document.createElement('div');
-    card.className = 'team-card';
+    card.className = 'team-card clickable-card';
+    card.style.cursor = 'pointer';
     card.innerHTML = `
       <span class="avatar avatar-lg" style="background:${c.bg};color:${c.text};width:46px;height:46px;font-size:15px">${tm.initials}</span>
       <div class="team-card-info">
@@ -373,8 +375,21 @@ function renderTeamPage(state, container) {
         <div class="team-card-earnings">Monthly: <strong>${formatCurrency(state, earnings[tm.id] || 0)}</strong></div>
         <div class="team-card-clients">${clientCount} client${clientCount !== 1 ? 's' : ''}</div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="deleteTeamMember('${tm.id}')">Remove</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:var(--text-muted)">View →</span>
+        <button class="btn btn-secondary btn-sm remove-tm-btn" data-id="${tm.id}">Remove</button>
+      </div>
     `;
+    // Click card → detail page (but not the Remove button)
+    card.addEventListener('click', e => {
+      if (e.target.closest('.remove-tm-btn')) return;
+      window.__currentMemberId = tm.id;
+      navigateTo('team-member');
+    });
+    card.querySelector('.remove-tm-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      deleteTeamMember(tm.id);
+    });
     grid.appendChild(card);
   });
 
