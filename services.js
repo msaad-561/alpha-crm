@@ -20,7 +20,7 @@ function renderServicesPage(state, container) {
     <div>
       <div class="section-title" style="font-size:16px">Services Updates</div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
-        Track deliverables per client · ${monthKeyToFullLabel(monthKey)}
+        Track deliverables per client · current retainer cycles
       </div>
     </div>
   `;
@@ -92,7 +92,7 @@ function buildClientServiceSection(state, client) {
           <div class="service-client-name">${client.name}</div>
           <div class="service-client-sub">
             ${totalQuota > 0
-              ? `${totalDone}/${totalQuota} items · ${monthKeyToFullLabel(viewMonth)}`
+              ? `${totalDone}/${totalQuota} items · ${retainerCycleLabel(viewMonth, client.startDay)}`
               : 'No service plan configured'}
           </div>
         </div>
@@ -124,8 +124,8 @@ function buildClientServiceSection(state, client) {
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
         </button>
         <span class="month-nav-label">
-          ${monthKeyToFullLabel(viewMonth)}
-          ${!isCurrentMonth ? '<span class="readonly-badge">Past · Read-only</span>' : '<span class="current-badge">Current Month</span>'}
+          ${retainerCycleLabel(viewMonth, client.startDay)}
+          ${!isCurrentMonth ? '<span class="readonly-badge">Past · Read-only</span>' : '<span class="current-badge">Current Cycle</span>'}
         </span>
         <button class="month-nav-btn" onclick="navigateServiceMonth('${client.id}', 1)"
           ${viewMonth === monthKey ? 'disabled' : ''}>
@@ -300,7 +300,7 @@ function updateSectionHeaderProgress(state, client, monthKey) {
 
   // Update sub text
   const sub = section.querySelector('.service-client-sub');
-  if (sub) sub.textContent = `${totalDone}/${totalQuota} items · ${monthKeyToFullLabel(monthKey)}`;
+  if (sub) sub.textContent = `${totalDone}/${totalQuota} items · ${retainerCycleLabel(monthKey, client.startDay)}`;
 
   // Update progress bar
   const fill = section.querySelector('.service-overall-progress .progress-fill');
@@ -316,4 +316,31 @@ function updateSectionHeaderProgress(state, client, monthKey) {
       ? `<span style="font-size:22px">✅</span>`
       : `<span class="avatar avatar-lg" style="background:${ac.bg};color:${ac.text}">${(client.name.split(' ').map(w=>w[0]).join('').slice(0,2)).toUpperCase()}</span>`;
   }
+}
+
+// ─── Retainer cycle label ────────────────────────────────────
+// Returns e.g. "21 Jun → 21 Jul" for a client whose cycle starts on day 21
+// monthKey: 'YYYY-MM' — this is the billing month the log is stored under
+function retainerCycleLabel(monthKey, startDay) {
+  if (!startDay || startDay <= 1) {
+    // Fallback: just show full month name
+    const [yr, mo] = monthKey.split('-').map(Number);
+    return new Date(yr, mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  const [yr, mo] = monthKey.split('-').map(Number);
+
+  // Cycle: from startDay of this month → startDay of next month
+  const startDate = new Date(yr, mo - 1, startDay);
+  const endDate   = new Date(yr, mo, startDay); // same day, next month
+
+  const fmt = d => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+  const endYr = endDate.getFullYear();
+
+  // If the period spans two years, append the year on end
+  const endLabel = endYr !== yr
+    ? endDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    : fmt(endDate);
+
+  return `${fmt(startDate)} → ${endLabel}`;
 }
