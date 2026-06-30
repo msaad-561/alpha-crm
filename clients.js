@@ -487,7 +487,10 @@ function openClientModal(state, clientId) {
         <div class="member-share-list">${memberRows || '<p style="color:var(--text-muted);font-size:13px">No team members assigned.</p>'}</div>
 
         <div class="payment-history">
-          <div class="ph-title">Payment History</div>
+          <div class="ph-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Payment History</span>
+            <button class="btn btn-primary btn-sm" id="add-past-month-btn" style="font-size:11px">+ Add Month</button>
+          </div>
           ${histRows || '<p style="color:var(--text-muted);font-size:13px">No payment records yet.</p>'}
         </div>
       </div>
@@ -529,6 +532,14 @@ function openClientModal(state, clientId) {
       client.clientStatus = newStatus;
       saveState(state);
       renderPage(state); // refresh underlying page
+    });
+  });
+
+  // â”€â”€ Add Past Month Payment
+  overlay.querySelector('#add-past-month-btn').addEventListener('click', () => {
+    openAddPastMonthModal(state, client, () => {
+      close();
+      openClientModal(state, clientId); // re-open refreshed
     });
   });
 
@@ -830,4 +841,135 @@ function toggleShareInput(memberId) {
   if (!input) return;
   input.style.display = chk && chk.checked ? 'block' : 'none';
   if (chk && chk.checked) input.focus();
+}
+
+// --- Add Past Month Payment Modal -----------------------------
+function openAddPastMonthModal(state, client, onSave) {
+  const today    = new Date();
+  const monthKey = getCurrentMonthKey(); // current month (upper bound)
+
+  // Build last 24 months as options, exclude months already recorded
+  const existing = new Set((client.payments || []).map(p => p.month));
+  const monthOpts = [];
+  for (let i = 1; i <= 36; i++) { // up to 3 years back
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    monthOpts.push(`<option value="${key}" ${existing.has(key) ? 'disabled style="color:var(--text-muted)"' : ''}>${label}${existing.has(key) ? ' (already added)' : ''}</option>`);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">?? Add Past Month Payment</div>
+          <div class="modal-subtitle">${client.name}</div>
+        </div>
+        <button class="modal-close" id="apm-close">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+
+        <div class="form-group">
+          <label class="form-label" for="apm-month">Month *</label>
+          <select class="form-input" id="apm-month">
+            <option value="">— Select a month —</option>
+            ${monthOpts.join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="apm-amount">Amount (${state.currency}) *</label>
+          <input class="form-input" type="number" id="apm-amount"
+            value="${client.retainerAmount}" min="0" />
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            Pre-filled with current retainer. Edit if the amount was different.
+          </div>
+        </div>
+
+        <div class="form-section-title">?? Payment Status</div>
+        <div class="status-selector" id="apm-status-sel" style="margin-bottom:16px">
+          <button type="button" class="status-option-btn selected-active" data-status="paid">
+            ? Paid / Received<br/>
+            <span style="font-size:10px;font-weight:400;opacity:.8">Payment was collected</span>
+          </button>
+          <button type="button" class="status-option-btn" data-status="unpaid">
+            ? Unpaid / Overdue<br/>
+            <span style="font-size:10px;font-weight:400;opacity:.8">Was not collected</span>
+          </button>
+        </div>
+
+        <div class="form-group" id="apm-paid-date-group">
+          <label class="form-label" for="apm-paid-date">Date Received *</label>
+          <input class="form-input" type="date" id="apm-paid-date"
+            value="${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}" />
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="apm-cancel">Cancel</button>
+        <button class="btn btn-primary" id="apm-save">Add Month</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+
+  const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('#apm-close').addEventListener('click', close);
+  overlay.querySelector('#apm-cancel').addEventListener('click', close);
+
+  let selectedStatus = 'paid';
+  const dateGroup = overlay.querySelector('#apm-paid-date-group');
+
+  overlay.querySelectorAll('#apm-status-sel .status-option-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('#apm-status-sel .status-option-btn').forEach(b => b.className = 'status-option-btn');
+      selectedStatus = btn.dataset.status;
+      btn.classList.add('selected-active');
+      dateGroup.style.display = selectedStatus === 'paid' ? '' : 'none';
+    });
+  });
+
+  overlay.querySelector('#apm-save').addEventListener('click', () => {
+    const selMonth = overlay.querySelector('#apm-month').value;
+    const amount   = parseFloat(overlay.querySelector('#apm-amount').value);
+    const paidDate = overlay.querySelector('#apm-paid-date').value;
+
+    if (!selMonth)             { alert('Please select a month.'); return; }
+    if (isNaN(amount) || amount < 0) { alert('Please enter a valid amount.'); return; }
+    if (selectedStatus === 'paid' && !paidDate) { alert('Please enter the date payment was received.'); return; }
+
+    const live   = window.__agencyState;
+    const lClient = (live.clients || []).find(c => c.id === client.id);
+    if (!lClient) return;
+
+    // Guard: don't add duplicate
+    const existing = lClient.payments.find(p => p.month === selMonth);
+    if (existing) {
+      if (!confirm(`A record for that month already exists. Overwrite it?`)) return;
+      existing.paid     = selectedStatus === 'paid';
+      existing.paidDate = selectedStatus === 'paid' ? paidDate : null;
+    } else {
+      lClient.payments.push({
+        month:    selMonth,
+        paid:     selectedStatus === 'paid',
+        paidDate: selectedStatus === 'paid' ? paidDate : null,
+      });
+    }
+
+    // Sort payments by month ascending
+    lClient.payments.sort((a, b) => a.month.localeCompare(b.month));
+
+    saveState(live);
+    close();
+    onSave();
+  });
 }
