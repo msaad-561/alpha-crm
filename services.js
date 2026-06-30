@@ -58,17 +58,25 @@ function buildClientServiceSection(state, client) {
   const monthKey      = getCurrentMonthKey();
   const viewMonth     = clientViewMonth[client.id] || monthKey;
   const isCurrentMonth = viewMonth === monthKey;
+  // Ensure a log exists for the viewed month (auto-create for past months)
+  ensureMonthLog(client, viewMonth);
   const progress      = getServicesProgress(client, viewMonth);
   const allTypes      = Object.keys(client.servicesPlan || {}).filter(t => client.servicesPlan[t] > 0);
   const totalDone     = allTypes.reduce((s, t) => s + (progress[t]?.done || 0), 0);
   const totalQuota    = allTypes.reduce((s, t) => s + (progress[t]?.quota || 0), 0);
   const allComplete   = totalQuota > 0 && totalDone >= totalQuota;
 
-  // Available months for navigation (sorted desc)
-  const availableMonths = [...new Set(client.servicesLog.map(l => l.month))]
-    .filter(m => m <= monthKey)
-    .sort()
-    .reverse();
+  // Build navigable months: current month + 23 months back (always navigable)
+  const availableMonths = [];
+  for (let i = 0; i < 24; i++) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    availableMonths.push(key);
+  }
+  // availableMonths[0] = most recent (current), last = oldest
+  availableMonths.reverse(); // now ascending so [0] = oldest
 
   const isExpanded = expandedClients.has(client.id);
   const ac = getAvatarColor(state.team.find(t => client.members[0]?.memberId === t.id)?.colorIdx ?? 0);
@@ -125,7 +133,9 @@ function buildClientServiceSection(state, client) {
         </button>
         <span class="month-nav-label">
           ${retainerCycleLabel(viewMonth, client.startDay)}
-          ${!isCurrentMonth ? '<span class="readonly-badge">Past · Read-only</span>' : '<span class="current-badge">Current Cycle</span>'}
+          ${isCurrentMonth
+            ? '<span class="current-badge">Current Cycle</span>'
+            : '<span class="readonly-badge" style="background:var(--bg-card);border:1px solid var(--border-light)">Past</span>'}
         </span>
         <button class="month-nav-btn" onclick="navigateServiceMonth('${client.id}', 1)"
           ${viewMonth === monthKey ? 'disabled' : ''}>
@@ -137,7 +147,7 @@ function buildClientServiceSection(state, client) {
         ? `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">
             No service plan set. <button class="btn btn-secondary btn-sm" onclick="openAddClientModal(window.__agencyState,'${client.id}')">Configure Plan</button>
            </div>`
-        : buildServiceTypesTabs(state, client, viewMonth, isCurrentMonth, allTypes, progress)
+        : buildServiceTypesTabs(state, client, viewMonth, allTypes, progress)
       }
     </div>
   `;
@@ -146,7 +156,7 @@ function buildClientServiceSection(state, client) {
 }
 
 // ─── Type tabs + checkbox grids ───────────────────────────────
-function buildServiceTypesTabs(state, client, viewMonth, isCurrentMonth, allTypes, progress) {
+function buildServiceTypesTabs(state, client, viewMonth, allTypes, progress) {
   const tabsHtml = allTypes.map((type, i) => {
     const { done, quota } = progress[type] || { done: 0, quota: 0 };
     const complete = quota > 0 && done >= quota;
@@ -166,12 +176,11 @@ function buildServiceTypesTabs(state, client, viewMonth, isCurrentMonth, allType
     const checks = (log && Array.isArray(log[type])) ? log[type] : Array(quota).fill(false);
 
     const checkboxHtml = checks.map((checked, idx) => `
-      <label class="service-checkbox-item ${checked ? 'checked' : ''} ${!isCurrentMonth ? 'readonly' : ''}"
-             for="chk-${client.id}-${type}-${idx}">
+      <label class="service-checkbox-item ${checked ? 'checked' : ''}"
+             for="chk-${client.id}-${viewMonth}-${type}-${idx}">
         <input type="checkbox"
-               id="chk-${client.id}-${type}-${idx}"
+               id="chk-${client.id}-${viewMonth}-${type}-${idx}"
                ${checked ? 'checked' : ''}
-               ${!isCurrentMonth ? 'disabled' : ''}
                onchange="toggleServiceCheck('${client.id}','${viewMonth}','${type}',${idx},this.checked)"
         />
         <span class="service-checkbox-label">${type.slice(0,-1)} #${idx + 1}</span>
@@ -217,10 +226,15 @@ function navigateServiceMonth(clientId, direction) {
   const client       = state.clients.find(c => c.id === clientId);
   if (!client) return;
 
-  const monthKey     = getCurrentMonthKey();
-  const available    = [...new Set(client.servicesLog.map(l => l.month))]
-    .filter(m => m <= monthKey)
-    .sort();
+  // Full 24-month window
+  const monthKey  = getCurrentMonthKey();
+  const available = [];
+  for (let i = 23; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    available.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
 
   const current = clientViewMonth[clientId] || monthKey;
   const idx     = available.indexOf(current);
@@ -228,6 +242,9 @@ function navigateServiceMonth(clientId, direction) {
 
   if (newIdx >= 0 && newIdx < available.length) {
     clientViewMonth[clientId] = available[newIdx];
+    // Auto-create log for the new month if needed
+    ensureMonthLog(client, available[newIdx]);
+    saveState(state);
     const container = document.getElementById('page-content');
     renderServicesPage(state, container);
   }

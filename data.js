@@ -218,6 +218,32 @@ function ensureCurrentMonthLog(client) {
   }
 }
 
+// Like ensureCurrentMonthLog but for ANY month key (used by services past-month nav)
+function ensureMonthLog(client, monthKey) {
+  if (!client.servicesPlan || !monthKey) return;
+  let log = client.servicesLog.find(l => l.month === monthKey);
+  if (!log) {
+    log = { month: monthKey };
+    Object.keys(client.servicesPlan).forEach(type => {
+      const quota = client.servicesPlan[type] || 0;
+      log[type] = Array(quota).fill(false);
+    });
+    client.servicesLog.push(log);
+  } else {
+    // Sync log size with current plan quotas
+    const plan = client.servicesPlan || {};
+    Object.keys(plan).forEach(type => {
+      const quota = plan[type] || 0;
+      if (!Array.isArray(log[type])) log[type] = Array(quota).fill(false);
+      else if (log[type].length < quota) {
+        while (log[type].length < quota) log[type].push(false);
+      } else if (log[type].length > quota) {
+        log[type] = log[type].slice(0, quota);
+      }
+    });
+  }
+}
+
 function getMonthLog(client, monthKey) {
   return client.servicesLog.find(l => l.month === monthKey) || null;
 }
